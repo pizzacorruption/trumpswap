@@ -552,17 +552,19 @@
     }
 
     function checkReady() {
-      const canGenerate = selectedPhoto && userFile && (debugMode || usageCount < MAX_USAGE);
+      // Keep tracking but don't enforce limit while developing
+      const canGenerate = selectedPhoto && userFile;
       generateBtn.disabled = !canGenerate;
     }
 
     // Generate
     generateBtn.addEventListener('click', async () => {
       if (!selectedPhoto || !userFile) return;
-      if (!debugMode && usageCount >= MAX_USAGE) {
-        showError('You\'ve used all your free swaps!');
-        return;
-      }
+      // TODO: Re-enable limit enforcement after development
+      // if (!debugMode && usageCount >= MAX_USAGE) {
+      //   showError('You\'ve used all your free swaps!');
+      //   return;
+      // }
 
       hideError();
       mainContent.style.display = 'none';
