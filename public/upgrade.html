@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade to Trump Swap Pro</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f23;
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 500px;
+      width: 100%;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      opacity: 0;
+      animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+
+    .logo {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #a1a1aa;
+      font-size: 1.1rem;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: rgba(26, 26, 46, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: 20px;
+      padding: 32px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 24px;
+    }
+
+    .price {
+      font-size: 3.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .price span {
+      font-size: 1.2rem;
+      font-weight: 400;
+      color: #a1a1aa;
+    }
+
+    .features {
+      list-style: none;
+      margin: 24px 0;
+      text-align: left;
+    }
+
+    .features li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .features li:last-child {
+      border-bottom: none;
+    }
+
+    .check {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .check svg {
+      width: 14px;
+      height: 14px;
+      stroke: white;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      color: #a1a1aa;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #ef4444;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .form-group input::placeholder {
+      color: #52525b;
+    }
+
+    .btn-upgrade {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-upgrade:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-upgrade:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-upgrade.loading {
+      pointer-events: none;
+    }
+
+    .btn-upgrade .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    .btn-upgrade.loading .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .back-link {
+      color: #71717a;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: #fff;
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      display: none;
+      text-align: left;
+    }
+
+    .error.visible {
+      display: block;
+      animation: shake 0.4s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+
+    .success-message {
+      display: none;
+    }
+
+    .success-message.visible {
+      display: block;
+    }
+
+    .success-message h2 {
+      color: #22c55e;
+      margin-bottom: 16px;
+    }
+
+    .success-message p {
+      color: #a1a1aa;
+      margin-bottom: 24px;
+    }
+
+    .canceled-notice {
+      background: rgba(251, 191, 36, 0.2);
+      border: 1px solid #fbbf24;
+      padding: 12px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .canceled-notice.visible {
+      display: block;
+    }
+
+    .guarantee {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #71717a;
+      font-size: 0.85rem;
+      margin-top: 16px;
+    }
+
+    .guarantee svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .container {
+        padding: 24px 16px;
+      }
+
+      h1 {
+        font-size: 1.6rem;
+      }
+
+      .card {
+        padding: 24px 20px;
+        border-radius: 16px;
+      }
+
+      .price {
+        font-size: 2.8rem;
+      }
+
+      .btn-upgrade {
+        padding: 14px;
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Success message (shown after successful payment) -->
+    <div class="success-message" id="successMessage">
+      <div class="logo fade-in-up">&#127881;</div>
+      <h2 class="fade-in-up delay-1">Welcome to Pro!</h2>
+      <p class="fade-in-up delay-2">Your subscription is now active. Enjoy unlimited Trump swaps without watermarks!</p>
+      <a href="/" class="btn-upgrade fade-in-up delay-3">Start Swapping</a>
+    </div>
+
+    <!-- Main upgrade form -->
+    <div id="upgradeForm">
+      <div class="logo fade-in-up">&#127941;</div>
+      <h1 class="fade-in-up delay-1">Trump Swap Pro</h1>
+      <p class="subtitle fade-in-up delay-2">Unlimited swaps, no watermarks</p>
+
+      <div class="canceled-notice" id="canceledNotice">
+        Your checkout was canceled. Ready to try again?
+      </div>
+
+      <div class="card fade-in-up delay-3">
+        <div class="price">$20<span>/month</span></div>
+
+        <ul class="features">
+          <li>
+            <div class="check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <span>Unlimited face swaps</span>
+          </li>
+          <li>
+            <div class="check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <span>No watermarks on images</span>
+          </li>
+          <li>
+            <div class="check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <span>Priority processing</span>
+          </li>
+          <li>
+            <div class="check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <span>Cancel anytime</span>
+          </li>
+        </ul>
+
+        <div class="error" id="error"></div>
+
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input type="email" id="email" placeholder="you@example.com" required>
+        </div>
+
+        <button class="btn-upgrade" id="upgradeBtn">
+          <span class="spinner"></span>
+          <span class="btn-text">Subscribe Now</span>
+        </button>
+
+        <div class="guarantee">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span>Secure payment via Stripe</span>
+        </div>
+      </div>
+
+      <a href="/" class="back-link fade-in-up delay-4">&#8592; Back to Trump Swap</a>
+    </div>
+  </div>
+
+  <script>
+    // Check URL params for success/cancel states
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const canceled = urlParams.get('canceled');
+
+    // Show success message if returning from successful checkout
+    if (sessionId) {
+      document.getElementById('upgradeForm').style.display = 'none';
+      document.getElementById('successMessage').classList.add('visible');
+    }
+
+    // Show canceled notice if checkout was canceled
+    if (canceled === 'true') {
+      document.getElementById('canceledNotice').classList.add('visible');
+    }
+
+    // Elements
+    const emailInput = document.getElementById('email');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const errorDiv = document.getElementById('error');
+
+    // Generate or get user ID (simple anonymous ID for now)
+    function getUserId() {
+      let userId = localStorage.getItem('trumpswap_user_id');
+      if (!userId) {
+        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('trumpswap_user_id', userId);
+      }
+      return userId;
+    }
+
+    // Validate email
+    function validateEmail(email) {
+      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return regex.test(email);
+    }
+
+    // Show error
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.add('visible');
+    }
+
+    // Hide error
+    function hideError() {
+      errorDiv.classList.remove('visible');
+    }
+
+    // Set loading state
+    function setLoading(loading) {
+      if (loading) {
+        upgradeBtn.classList.add('loading');
+        upgradeBtn.disabled = true;
+      } else {
+        upgradeBtn.classList.remove('loading');
+        upgradeBtn.disabled = false;
+      }
+    }
+
+    // Handle upgrade click
+    upgradeBtn.addEventListener('click', async () => {
+      hideError();
+
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        showError('Please enter your email address');
+        emailInput.focus();
+        return;
+      }
+
+      if (!validateEmail(email)) {
+        showError('Please enter a valid email address');
+        emailInput.focus();
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const response = await fetch('/api/create-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: getUserId(),
+            email: email
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        if (data.checkoutUrl) {
+          // Redirect to Stripe Checkout
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error('No checkout URL received');
+        }
+      } catch (error) {
+        setLoading(false);
+        showError(error.message || 'Something went wrong. Please try again.');
+      }
+    });
+
+    // Allow Enter key to submit
+    emailInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        upgradeBtn.click();
+      }
+    });
+
+    // Pre-fill email if stored
+    const storedEmail = localStorage.getItem('trumpswap_email');
+    if (storedEmail) {
+      emailInput.value = storedEmail;
+    }
+
+    // Save email on input
+    emailInput.addEventListener('blur', () => {
+      if (emailInput.value.trim()) {
+        localStorage.setItem('trumpswap_email', emailInput.value.trim());
+      }
+    });
+  </script>
+</body>
+</html>

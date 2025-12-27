@@ -6,10 +6,18 @@
 # Generated outputs - don't commit
 output/
 
-# Test files
-test-face.jpg
-test-result-screenshot.png
-test-error-screenshot.png
+# Test files and screenshots
+test-*.jpg
+test-*.png
+test-*.txt
+test-screenshots/
+test-outputs/
+
+# Backup files
+*.bak
+*~
+*.orig
+*.tmp
 
 # Dependencies
 node_modules/

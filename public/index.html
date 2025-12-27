@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trump Swap</title>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -16,6 +18,7 @@
       background: #0f0f23;
       min-height: 100vh;
       color: #fff;
+      overflow-x: hidden;
     }
 
     .container {
@@ -23,6 +26,28 @@
       margin: 0 auto;
       padding: 40px 20px;
     }
+
+    /* Fade-in-up animation system */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      opacity: 0;
+      animation: fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .fade-in-up.delay-1 { animation-delay: 0.1s; }
+    .fade-in-up.delay-2 { animation-delay: 0.2s; }
+    .fade-in-up.delay-3 { animation-delay: 0.3s; }
+    .fade-in-up.delay-4 { animation-delay: 0.4s; }
 
     header {
       text-align: center;
@@ -33,6 +58,7 @@
       font-size: 3rem;
       margin-bottom: 8px;
       color: #fff;
+      letter-spacing: -0.02em;
     }
 
     .subtitle {
@@ -48,6 +74,7 @@
       border-radius: 20px;
       font-size: 0.85rem;
       margin-top: 12px;
+      transition: all 0.3s ease;
     }
 
     .usage-badge.debug {
@@ -59,10 +86,17 @@
     .card {
       background: rgba(26, 26, 46, 0.6);
       backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border-radius: 16px;
       padding: 24px;
       margin-bottom: 20px;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
     }
 
     .card-title {
@@ -75,9 +109,15 @@
     /* Photo gallery grid */
     .gallery {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
       gap: 12px;
       margin-bottom: 16px;
+    }
+
+    @media (min-width: 640px) {
+      .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      }
     }
 
     .gallery-item {
@@ -86,24 +126,47 @@
       overflow: hidden;
       cursor: pointer;
       border: 3px solid transparent;
-      transition: all 0.2s;
+      transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
       position: relative;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .gallery-item::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(239, 68, 68, 0) 50%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1;
+      pointer-events: none;
     }
 
     .gallery-item:hover {
-      border-color: rgba(239, 68, 68, 0.5);
-      transform: scale(1.02);
+      border-color: rgba(239, 68, 68, 0.6);
+      transform: scale(1.05) translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(239, 68, 68, 0.3);
+    }
+
+    .gallery-item:hover::before {
+      opacity: 1;
     }
 
     .gallery-item.selected {
       border-color: #ef4444;
-      box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+      box-shadow: 0 0 24px rgba(239, 68, 68, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+      transform: scale(1.02);
     }
 
     .gallery-item img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+
+    .gallery-item:hover img {
+      transform: scale(1.1);
     }
 
     .gallery-item .check {
@@ -118,6 +181,13 @@
       align-items: center;
       justify-content: center;
       font-size: 14px;
+      z-index: 2;
+      animation: scaleIn 0.2s ease;
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
     }
 
     .gallery-item.selected .check {
@@ -132,11 +202,17 @@
       border-radius: 8px;
       cursor: pointer;
       font-size: 0.95rem;
-      transition: all 0.2s;
+      transition: all 0.3s ease;
     }
 
     .btn-random:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-random:active {
+      transform: translateY(0);
     }
 
     /* Upload zone */
@@ -146,12 +222,28 @@
       padding: 40px 20px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
     .upload-zone:hover {
       border-color: #ef4444;
       background: rgba(239, 68, 68, 0.05);
+      transform: translateY(-2px);
+    }
+
+    .upload-zone:hover::before {
+      opacity: 1;
     }
 
     .upload-zone.has-file {
@@ -159,9 +251,20 @@
       background: rgba(34, 197, 94, 0.05);
     }
 
+    .upload-zone.dragover {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      transform: scale(1.02);
+    }
+
     .upload-icon {
       font-size: 2.5rem;
       margin-bottom: 12px;
+      transition: transform 0.3s ease;
+    }
+
+    .upload-zone:hover .upload-icon {
+      transform: scale(1.1);
     }
 
     .upload-text {
@@ -181,6 +284,7 @@
 
     .preview-container.visible {
       display: block;
+      animation: fadeInUp 0.4s ease;
     }
 
     .preview-img {
@@ -189,6 +293,7 @@
       border-radius: 8px;
       margin: 0 auto;
       display: block;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     }
 
     input[type="file"] {
@@ -204,15 +309,38 @@
       border: none;
       border-radius: 12px;
       cursor: pointer;
-      transition: all 0.2s;
-      background: #ef4444;
+      transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-generate::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .btn-generate:hover:not(:disabled)::before {
+      opacity: 1;
+    }
+
+    .btn-generate span {
+      position: relative;
+      z-index: 1;
     }
 
     .btn-generate:hover:not(:disabled) {
-      background: #dc2626;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn-generate:active:not(:disabled) {
+      transform: translateY(-1px);
     }
 
     .btn-generate:disabled {
@@ -225,25 +353,71 @@
     .loading {
       display: none;
       text-align: center;
-      padding: 40px;
+      padding: 60px 20px;
     }
 
     .loading.visible {
       display: block;
+      animation: fadeInUp 0.4s ease;
     }
 
     .spinner {
-      width: 50px;
-      height: 50px;
+      width: 60px;
+      height: 60px;
       border: 4px solid rgba(255, 255, 255, 0.1);
       border-top-color: #ef4444;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
+      margin: 0 auto 24px;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    .loading-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .loading-subtitle {
+      color: #71717a;
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    .loading-progress {
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ef4444, #f97316);
+      border-radius: 2px;
+      animation: progressPulse 2s ease-in-out infinite;
+      width: 60%;
+    }
+
+    @keyframes progressPulse {
+      0%, 100% { width: 30%; opacity: 0.8; }
+      50% { width: 80%; opacity: 1; }
+    }
+
+    .loading-tips {
+      color: #52525b;
+      font-size: 0.85rem;
+      font-style: italic;
     }
 
     /* Result */
@@ -254,13 +428,24 @@
 
     .result.visible {
       display: block;
+      animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .result-image-container {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 24px;
     }
 
     .result img {
       max-width: 100%;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      border-radius: 16px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease;
+    }
+
+    .result img:hover {
+      transform: scale(1.02);
     }
 
     .result-actions {
@@ -270,35 +455,77 @@
       flex-wrap: wrap;
     }
 
-    .btn-download {
-      background: #22c55e;
-      color: #fff;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 8px;
+    .btn-download, .btn-share, .btn-another {
+      padding: 14px 28px;
+      border-radius: 10px;
       font-size: 1rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-download {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #fff;
+      border: none;
     }
 
     .btn-download:hover {
-      background: #16a34a;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+    }
+
+    .btn-share {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      color: #fff;
+      border: none;
+    }
+
+    .btn-share:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
     }
 
     .btn-another {
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
-      padding: 12px 24px;
       border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: all 0.2s;
     }
 
     .btn-another:hover {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .btn-icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Share success toast */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(34, 197, 94, 0.95);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+    }
+
+    .toast.visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
     }
 
     /* Error */
@@ -309,6 +536,13 @@
       border-radius: 8px;
       margin-bottom: 16px;
       display: none;
+      animation: shake 0.4s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
     }
 
     .error.visible {
@@ -334,31 +568,700 @@
       font-size: 0.75rem;
       color: #71717a;
       cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
     }
 
     .debug-toggle:hover {
       color: #fff;
+      background: rgba(0, 0, 0, 0.9);
     }
 
-    @keyframes fadeInUp {
+    /* Admin Panel Styles */
+    .admin-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .admin-overlay.visible {
+      display: flex;
+    }
+
+    .admin-modal {
+      background: #1a1a2e;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    }
+
+    .admin-modal h2 {
+      margin-bottom: 20px;
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .admin-modal h2 svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .admin-login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .admin-login-form input {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .admin-login-form input:focus {
+      outline: none;
+      border-color: #fbbf24;
+    }
+
+    .admin-login-form input::placeholder {
+      color: #71717a;
+    }
+
+    .btn-admin-login {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1f1f1f;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-admin-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(251, 191, 36, 0.3);
+    }
+
+    .btn-admin-login:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .admin-error {
+      color: #ef4444;
+      font-size: 0.9rem;
+      padding: 10px;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 6px;
+      display: none;
+    }
+
+    .admin-error.visible {
+      display: block;
+    }
+
+    .btn-admin-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      color: #71717a;
+      cursor: pointer;
+      font-size: 1.5rem;
+      line-height: 1;
+      padding: 4px;
+      transition: color 0.2s ease;
+    }
+
+    .btn-admin-close:hover {
+      color: #fff;
+    }
+
+    /* Admin Debug Panel */
+    .admin-panel {
+      display: none;
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 360px;
+      max-height: calc(100vh - 100px);
+      background: rgba(26, 26, 46, 0.95);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      z-index: 1000;
+      overflow-y: auto;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .admin-panel.visible {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
       from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateX(20px);
       }
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateX(0);
       }
     }
 
+    .admin-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .admin-panel-title {
+      color: #fbbf24;
+      font-weight: 600;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .admin-panel-title svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .btn-admin-logout {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-admin-logout:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    .admin-section {
+      margin-bottom: 16px;
+    }
+
+    .admin-section-title {
+      color: #a1a1aa;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .admin-stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .admin-stat-label {
+      color: #71717a;
+    }
+
+    .admin-stat-value {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    .admin-stat-value.good {
+      color: #22c55e;
+    }
+
+    .admin-stat-value.warn {
+      color: #fbbf24;
+    }
+
+    .admin-stat-value.bad {
+      color: #ef4444;
+    }
+
+    .admin-badge {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1f1f1f;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      z-index: 1000;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .admin-badge:hover {
+      transform: scale(1.05);
+    }
+
+    .admin-badge.visible {
+      display: flex;
+    }
+
+    .admin-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .btn-refresh-debug {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 12px;
+    }
+
+    .btn-refresh-debug:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Generation debug info */
+    .generation-debug {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 16px;
+      font-size: 0.85rem;
+    }
+
+    .generation-debug-title {
+      color: #22c55e;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 640px) {
+      .admin-panel {
+        right: 10px;
+        left: 10px;
+        width: auto;
+        top: 70px;
+        max-height: calc(100vh - 90px);
+      }
+
+      .admin-badge {
+        top: 10px;
+        left: 10px;
+      }
+
+      .admin-modal {
+        margin: 16px;
+        padding: 24px;
+      }
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 640px) {
+      .container {
+        padding: 24px 16px;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+      }
+
+      .card {
+        padding: 20px 16px;
+        border-radius: 14px;
+      }
+
+      .card:hover {
+        transform: none;
+      }
+
+      .gallery {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .gallery-item {
+        border-radius: 10px;
+      }
+
+      .gallery-item:hover {
+        transform: none;
+        box-shadow: none;
+      }
+
+      .gallery-item:active {
+        transform: scale(0.95);
+      }
+
+      .upload-zone {
+        padding: 32px 16px;
+      }
+
+      .upload-zone:hover {
+        transform: none;
+      }
+
+      .btn-generate {
+        padding: 14px;
+        font-size: 1rem;
+        border-radius: 10px;
+      }
+
+      .btn-generate:hover:not(:disabled) {
+        transform: none;
+        box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+      }
+
+      .result-actions {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .btn-download, .btn-share, .btn-another {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+      }
+
+      .loading {
+        padding: 40px 16px;
+      }
+
+      .spinner {
+        width: 50px;
+        height: 50px;
+      }
+
+      .loading-title {
+        font-size: 1.1rem;
+      }
+
+      footer {
+        padding: 32px 16px;
+      }
+
+      .debug-toggle {
+        bottom: 16px;
+        right: 16px;
+        font-size: 0.7rem;
+        padding: 6px 10px;
+      }
+    }
+
+    /* Touch-friendly improvements */
+    @media (hover: none) {
+      .gallery-item:hover {
+        transform: none;
+        border-color: transparent;
+        box-shadow: none;
+      }
+
+      .gallery-item:hover::before {
+        opacity: 0;
+      }
+
+      .gallery-item:hover img {
+        transform: none;
+      }
+
+      .gallery-item.selected {
+        transform: none;
+      }
+    }
+
+    /* Animate in helper */
     .animate-in {
-      animation: fadeInUp 0.3s ease-out;
+      animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Auth Header Bar */
+    .auth-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding: 0 4px;
+    }
+
+    /* Google Sign In Button */
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      color: #1f1f1f;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .btn-google:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-google:active {
+      transform: translateY(0);
+    }
+
+    .btn-google svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* User Profile Section */
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid rgba(239, 68, 68, 0.6);
+      object-fit: cover;
+      transition: all 0.3s ease;
+    }
+
+    .user-avatar:hover {
+      border-color: #ef4444;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .user-name {
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .user-tier {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 2px;
+    }
+
+    .user-tier.free {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    .user-tier.pro {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3));
+      color: #fbbf24;
+    }
+
+    .btn-logout {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #a1a1aa;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-logout:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+
+    /* Usage Counter */
+    .usage-counter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(26, 26, 46, 0.8);
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .usage-counter-text {
+      color: #a1a1aa;
+      font-size: 0.85rem;
+    }
+
+    .usage-counter-value {
+      color: #ef4444;
+      font-weight: 600;
+    }
+
+    .usage-counter-value.unlimited {
+      color: #fbbf24;
+    }
+
+    /* Upgrade Button */
+    .btn-upgrade {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      color: #1f1f1f;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-upgrade:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
+    }
+
+    .btn-upgrade:active {
+      transform: translateY(0);
+    }
+
+    .btn-upgrade svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Auth loading state */
+    .auth-loading {
+      color: #71717a;
+      font-size: 0.85rem;
+    }
+
+    /* Hide elements based on auth state */
+    .auth-hidden {
+      display: none !important;
+    }
+
+    /* Mobile auth bar */
+    @media (max-width: 640px) {
+      .auth-bar {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .user-profile {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .user-info {
+        align-items: center;
+      }
+
+      .btn-google {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+      }
+
+      .usage-counter {
+        width: 100%;
+        justify-content: center;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
+    <!-- Auth Bar -->
+    <div class="auth-bar fade-in-up" id="authBar">
+      <!-- Loading state (shown while checking auth) -->
+      <span class="auth-loading" id="authLoading">Loading...</span>
+
+      <!-- Logged out state -->
+      <button class="btn-google auth-hidden" id="googleSignInBtn">
+        <svg viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <!-- Logged in state -->
+      <div class="user-profile auth-hidden" id="userProfile">
+        <div class="usage-counter" id="usageCounter">
+          <span class="usage-counter-text">Generations:</span>
+          <span class="usage-counter-value" id="usageCounterValue">0 / 3</span>
+        </div>
+        <a href="/upgrade" class="btn-upgrade auth-hidden" id="upgradeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          Upgrade to Pro
+        </a>
+        <div class="user-info">
+          <span class="user-name" id="userName">User</span>
+          <span class="user-tier free" id="userTier">Free</span>
+        </div>
+        <img class="user-avatar" id="userAvatar" src="" alt="User avatar">
+        <button class="btn-logout" id="logoutBtn">Sign Out</button>
+      </div>
+    </div>
+
+    <header class="fade-in-up">
       <h1>Trump Swap</h1>
       <p class="subtitle">Put yourself next to the Donald</p>
       <div class="usage-badge" id="usageBadge">3 swaps remaining</div>
@@ -368,19 +1271,25 @@
       <div class="error" id="error"></div>
 
       <!-- Step 1: Pick a Trump photo -->
-      <div class="card">
+      <div class="card fade-in-up delay-1">
         <div class="card-title">1. Pick a Trump photo</div>
         <div class="gallery" id="gallery">
           <!-- Photos loaded dynamically -->
         </div>
-        <button class="btn-random" id="randomBtn">🎲 Surprise me</button>
+        <button class="btn-random" id="randomBtn">Surprise me</button>
       </div>
 
       <!-- Step 2: Upload your face -->
-      <div class="card">
+      <div class="card fade-in-up delay-2">
         <div class="card-title">2. Upload your face</div>
         <div class="upload-zone" id="uploadZone">
-          <div class="upload-icon">📸</div>
+          <div class="upload-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          </div>
           <div class="upload-text">Drop your photo here or click to upload</div>
           <div class="upload-hint">Clear face shot works best</div>
           <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
@@ -391,43 +1300,190 @@
       </div>
 
       <!-- Generate -->
-      <button class="btn-generate" id="generateBtn" disabled>
-        Swap Faces 🔄
+      <button class="btn-generate fade-in-up delay-3" id="generateBtn" disabled>
+        <span>Swap Faces</span>
       </button>
     </div>
 
     <!-- Loading state -->
     <div class="loading" id="loading">
       <div class="spinner"></div>
-      <p>Swapping faces...</p>
-      <p style="color: #71717a; font-size: 0.9rem; margin-top: 8px;">This takes 15-30 seconds</p>
+      <p class="loading-title" id="loadingTitle">Swapping faces...</p>
+      <p class="loading-subtitle" id="loadingSubtitle">Our AI is working its magic</p>
+      <div class="loading-progress">
+        <div class="progress-bar">
+          <div class="progress-fill"></div>
+        </div>
+        <p class="loading-tips" id="loadingTips">This usually takes 15-30 seconds</p>
+      </div>
     </div>
 
     <!-- Result -->
     <div class="card result" id="result">
-      <img id="resultImage" alt="Your Trump swap">
+      <div class="result-image-container">
+        <img id="resultImage" alt="Your Trump swap">
+      </div>
       <div class="result-actions">
-        <button class="btn-download" id="downloadBtn">Download 📥</button>
+        <button class="btn-download" id="downloadBtn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Download
+        </button>
+        <button class="btn-share" id="shareBtn">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          Share
+        </button>
         <button class="btn-another" id="anotherBtn">Try Another</button>
       </div>
     </div>
   </div>
 
-  <footer>
-    <p>For entertainment purposes only • Images may contain watermark</p>
+  <!-- Toast notification -->
+  <div class="toast" id="toast">Link copied to clipboard!</div>
+
+  <footer class="fade-in-up delay-4">
+    <p>For entertainment purposes only</p>
   </footer>
 
   <div class="debug-toggle" id="debugToggle">Debug: OFF</div>
 
+  <!-- Admin Badge (shown when logged in as admin) -->
+  <div class="admin-badge" id="adminBadge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+    ADMIN MODE
+  </div>
+
+  <!-- Admin Debug Panel -->
+  <div class="admin-panel" id="adminPanel">
+    <div class="admin-panel-header">
+      <div class="admin-panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Debug Panel
+      </div>
+      <button class="btn-admin-logout" id="adminLogoutBtn">Logout</button>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Server Status</div>
+      <div id="adminServerStats">
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Configuration</div>
+      <div id="adminConfigStats">
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Usage Stats</div>
+      <div id="adminUsageStats">
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-section-title">Supabase</div>
+      <div id="adminSupabaseStats">
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Loading...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-section" id="lastGenerationDebug" style="display: none;">
+      <div class="admin-section-title">Last Generation</div>
+      <div id="adminGenerationStats"></div>
+    </div>
+
+    <button class="btn-refresh-debug" id="refreshDebugBtn">Refresh Debug Info</button>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div class="admin-overlay" id="adminOverlay">
+    <div class="admin-modal" style="position: relative;">
+      <button class="btn-admin-close" id="adminCloseBtn">&times;</button>
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Admin Access
+      </h2>
+      <form class="admin-login-form" id="adminLoginForm">
+        <input type="password" id="adminPasswordInput" placeholder="Enter admin password" autocomplete="off">
+        <div class="admin-error" id="adminLoginError"></div>
+        <button type="submit" class="btn-admin-login" id="adminLoginBtn">Login</button>
+      </form>
+      <p style="color: #71717a; font-size: 0.8rem; margin-top: 16px; text-align: center;">
+        Access via Ctrl+Shift+A or ?admin=PASSWORD
+      </p>
+    </div>
+  </div>
+
   <script>
-    // State
+    // =====================================================
+    // SUPABASE CONFIGURATION
+    // =====================================================
+    // TODO: Replace with your actual Supabase credentials
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+    // Initialize Supabase client
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // =====================================================
+    // STATE
+    // =====================================================
     let selectedPhoto = null;
     let userFile = null;
     let usageCount = parseInt(localStorage.getItem('trumpswap_usage') || '0');
     let debugMode = localStorage.getItem('trumpswap_debug') === 'true';
+    let loadingInterval = null;
     const MAX_USAGE = 3;
 
-    // Elements
+    // Auth state
+    let currentUser = null;
+    let currentSession = null;
+    let userTier = 'free'; // 'free' or 'pro'
+    let serverUsageCount = 0;
+
+    // Admin state
+    let adminToken = localStorage.getItem('trumpswap_admin_token') || null;
+    let adminPanelVisible = false;
+    let lastGenerationDebugInfo = null;
+
+    // Loading messages for better UX
+    const loadingMessages = [
+      { title: 'Analyzing your photo...', subtitle: 'Finding the perfect match', tip: 'AI is detecting facial features' },
+      { title: 'Swapping faces...', subtitle: 'Our AI is working its magic', tip: 'This usually takes 15-30 seconds' },
+      { title: 'Almost there...', subtitle: 'Putting on the finishing touches', tip: 'Just a few more moments' },
+      { title: 'Finalizing...', subtitle: 'Making sure everything looks perfect', tip: 'Your image is almost ready' }
+    ];
+
+    // =====================================================
+    // ELEMENTS
+    // =====================================================
     const gallery = document.getElementById('gallery');
     const randomBtn = document.getElementById('randomBtn');
     const uploadZone = document.getElementById('uploadZone');
@@ -437,22 +1493,583 @@
     const generateBtn = document.getElementById('generateBtn');
     const mainContent = document.getElementById('mainContent');
     const loading = document.getElementById('loading');
+    const loadingTitle = document.getElementById('loadingTitle');
+    const loadingSubtitle = document.getElementById('loadingSubtitle');
+    const loadingTips = document.getElementById('loadingTips');
     const result = document.getElementById('result');
     const resultImage = document.getElementById('resultImage');
     const downloadBtn = document.getElementById('downloadBtn');
+    const shareBtn = document.getElementById('shareBtn');
     const anotherBtn = document.getElementById('anotherBtn');
     const errorDiv = document.getElementById('error');
     const usageBadge = document.getElementById('usageBadge');
     const debugToggle = document.getElementById('debugToggle');
+    const toast = document.getElementById('toast');
+
+    // Auth elements
+    const authLoading = document.getElementById('authLoading');
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    const userProfile = document.getElementById('userProfile');
+    const userAvatar = document.getElementById('userAvatar');
+    const userName = document.getElementById('userName');
+    const userTierBadge = document.getElementById('userTier');
+    const usageCounter = document.getElementById('usageCounter');
+    const usageCounterValue = document.getElementById('usageCounterValue');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Admin elements
+    const adminBadge = document.getElementById('adminBadge');
+    const adminPanel = document.getElementById('adminPanel');
+    const adminOverlay = document.getElementById('adminOverlay');
+    const adminLoginForm = document.getElementById('adminLoginForm');
+    const adminPasswordInput = document.getElementById('adminPasswordInput');
+    const adminLoginError = document.getElementById('adminLoginError');
+    const adminLoginBtn = document.getElementById('adminLoginBtn');
+    const adminCloseBtn = document.getElementById('adminCloseBtn');
+    const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+    const refreshDebugBtn = document.getElementById('refreshDebugBtn');
 
     // Trump photos (loaded from server)
     let trumpPhotos = [];
 
-    // Initialize
+    // =====================================================
+    // AUTH FUNCTIONS
+    // =====================================================
+
+    // Get current JWT token for API requests
+    function getAuthToken() {
+      return currentSession?.access_token || null;
+    }
+
+    // Helper to make authenticated API requests
+    async function fetchWithAuth(url, options = {}) {
+      const token = getAuthToken();
+      const headers = {
+        ...options.headers,
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      return fetch(url, {
+        ...options,
+        headers
+      });
+    }
+
+    // Sign in with Google
+    async function signInWithGoogle() {
+      try {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin
+          }
+        });
+
+        if (error) {
+          console.error('Google sign-in error:', error);
+          showError('Failed to sign in with Google');
+        }
+      } catch (err) {
+        console.error('Sign-in error:', err);
+        showError('Failed to sign in');
+      }
+    }
+
+    // Sign out
+    async function signOut() {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Sign-out error:', error);
+        }
+        // State will be updated by auth state listener
+      } catch (err) {
+        console.error('Sign-out error:', err);
+      }
+    }
+
+    // Fetch user usage data from server
+    async function fetchUserUsage() {
+      if (!currentUser) return;
+
+      try {
+        const res = await fetchWithAuth('/api/user/usage');
+        if (res.ok) {
+          const data = await res.json();
+          serverUsageCount = data.usageCount || 0;
+          userTier = data.tier || 'free';
+          updateAuthUI();
+        }
+      } catch (err) {
+        console.error('Failed to fetch usage:', err);
+        // Fall back to local storage usage
+      }
+    }
+
+    // Update UI based on auth state
+    function updateAuthUI() {
+      // Hide loading
+      authLoading.classList.add('auth-hidden');
+
+      if (currentUser) {
+        // Show logged in state
+        googleSignInBtn.classList.add('auth-hidden');
+        userProfile.classList.remove('auth-hidden');
+
+        // Set user info
+        userName.textContent = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
+
+        // Set avatar
+        const avatarUrl = currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture;
+        if (avatarUrl) {
+          userAvatar.src = avatarUrl;
+          userAvatar.style.display = 'block';
+        } else {
+          userAvatar.style.display = 'none';
+        }
+
+        // Set tier badge
+        if (userTier === 'pro') {
+          userTierBadge.textContent = 'Pro';
+          userTierBadge.classList.remove('free');
+          userTierBadge.classList.add('pro');
+          upgradeBtn.classList.add('auth-hidden');
+          usageCounterValue.textContent = 'Unlimited';
+          usageCounterValue.classList.add('unlimited');
+        } else {
+          userTierBadge.textContent = 'Free';
+          userTierBadge.classList.remove('pro');
+          userTierBadge.classList.add('free');
+          upgradeBtn.classList.remove('auth-hidden');
+          usageCounterValue.textContent = `${serverUsageCount} / ${MAX_USAGE}`;
+          usageCounterValue.classList.remove('unlimited');
+        }
+
+        // Update legacy usage badge in header
+        if (userTier === 'pro') {
+          usageBadge.textContent = 'Unlimited swaps';
+          usageBadge.classList.add('debug');
+        } else {
+          const remaining = MAX_USAGE - serverUsageCount;
+          usageBadge.textContent = remaining > 0 ? `${remaining} swap${remaining !== 1 ? 's' : ''} remaining` : 'No swaps remaining';
+          usageBadge.classList.remove('debug');
+        }
+
+      } else {
+        // Show logged out state
+        googleSignInBtn.classList.remove('auth-hidden');
+        userProfile.classList.add('auth-hidden');
+
+        // Reset to local storage usage for non-logged-in users
+        updateUsageBadge();
+      }
+    }
+
+    // Initialize auth
+    async function initAuth() {
+      // Check for existing session
+      const { data: { session }, error } = await supabase.auth.getSession();
+
+      if (session) {
+        currentSession = session;
+        currentUser = session.user;
+        await fetchUserUsage();
+      }
+
+      updateAuthUI();
+
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed:', event);
+        currentSession = session;
+        currentUser = session?.user || null;
+
+        if (currentUser) {
+          await fetchUserUsage();
+        } else {
+          serverUsageCount = 0;
+          userTier = 'free';
+        }
+
+        updateAuthUI();
+      });
+    }
+
+    // Auth event listeners
+    googleSignInBtn.addEventListener('click', signInWithGoogle);
+    logoutBtn.addEventListener('click', signOut);
+
+    // =====================================================
+    // ADMIN FUNCTIONS
+    // =====================================================
+
+    // Check if admin token is valid
+    async function checkAdminStatus() {
+      if (!adminToken) return false;
+
+      try {
+        const res = await fetch('/api/admin/status', {
+          headers: { 'X-Admin-Token': adminToken }
+        });
+        const data = await res.json();
+        return data.isAdmin === true;
+      } catch (err) {
+        console.error('Admin status check failed:', err);
+        return false;
+      }
+    }
+
+    // Login as admin
+    async function adminLogin(password) {
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Login failed');
+        }
+
+        adminToken = data.token;
+        localStorage.setItem('trumpswap_admin_token', adminToken);
+        return true;
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    // Logout admin
+    async function adminLogout() {
+      try {
+        if (adminToken) {
+          await fetch('/api/admin/logout', {
+            method: 'POST',
+            headers: { 'X-Admin-Token': adminToken }
+          });
+        }
+      } catch (err) {
+        console.error('Admin logout error:', err);
+      }
+
+      adminToken = null;
+      localStorage.removeItem('trumpswap_admin_token');
+      updateAdminUI(false);
+    }
+
+    // Fetch debug info
+    async function fetchDebugInfo() {
+      if (!adminToken) return null;
+
+      try {
+        const res = await fetch('/api/admin/debug', {
+          headers: { 'X-Admin-Token': adminToken }
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            // Token expired, logout
+            adminLogout();
+            return null;
+          }
+          throw new Error('Failed to fetch debug info');
+        }
+
+        return await res.json();
+      } catch (err) {
+        console.error('Debug fetch error:', err);
+        return null;
+      }
+    }
+
+    // Update admin UI
+    function updateAdminUI(isAdmin) {
+      if (isAdmin) {
+        adminBadge.classList.add('visible');
+        adminOverlay.classList.remove('visible');
+        usageBadge.textContent = 'Admin Mode (unlimited)';
+        usageBadge.classList.add('debug');
+        refreshDebugPanel();
+      } else {
+        adminBadge.classList.remove('visible');
+        adminPanel.classList.remove('visible');
+        adminPanelVisible = false;
+        updateUsageBadge();
+      }
+    }
+
+    // Render debug panel stats
+    function renderDebugStats(data) {
+      if (!data) return;
+
+      // Server stats
+      const serverHtml = `
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Uptime</span>
+          <span class="admin-stat-value">${formatUptime(data.server?.uptime)}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Node Version</span>
+          <span class="admin-stat-value">${data.server?.nodeVersion || 'N/A'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Memory (RSS)</span>
+          <span class="admin-stat-value">${formatBytes(data.server?.memoryUsage?.rss)}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Platform</span>
+          <span class="admin-stat-value">${data.server?.platform || 'N/A'}</span>
+        </div>
+      `;
+      document.getElementById('adminServerStats').innerHTML = serverHtml;
+
+      // Config stats
+      const configHtml = `
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Gemini API</span>
+          <span class="admin-stat-value ${data.config?.apiKeySet ? 'good' : 'bad'}">${data.config?.apiKeySet ? 'Set' : 'Missing'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Stripe</span>
+          <span class="admin-stat-value ${data.config?.stripeConfigured ? 'good' : 'warn'}">${data.config?.stripeConfigured ? 'Configured' : 'Not Set'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Supabase</span>
+          <span class="admin-stat-value ${data.config?.supabaseConfigured ? 'good' : 'warn'}">${data.config?.supabaseConfigured ? 'Configured' : 'Not Set'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Model</span>
+          <span class="admin-stat-value">${data.config?.model || 'N/A'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Timeout</span>
+          <span class="admin-stat-value">${(data.config?.timeout / 1000) || 120}s</span>
+        </div>
+      `;
+      document.getElementById('adminConfigStats').innerHTML = configHtml;
+
+      // Usage stats
+      const usageHtml = `
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Trump Photos</span>
+          <span class="admin-stat-value">${data.stats?.trumpPhotosCount || 0}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Anonymous Users</span>
+          <span class="admin-stat-value">${data.stats?.anonymousUsersTracked || 0}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Active Admin Sessions</span>
+          <span class="admin-stat-value">${data.stats?.activeAdminSessions || 0}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Your Tier</span>
+          <span class="admin-stat-value good">${data.currentRequest?.userTier || 'admin'}</span>
+        </div>
+      `;
+      document.getElementById('adminUsageStats').innerHTML = usageHtml;
+
+      // Supabase stats
+      const supabaseHtml = `
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">Connected</span>
+          <span class="admin-stat-value ${data.supabase?.connected ? 'good' : 'bad'}">${data.supabase?.connected ? 'Yes' : 'No'}</span>
+        </div>
+        <div class="admin-stat-row">
+          <span class="admin-stat-label">URL</span>
+          <span class="admin-stat-value">${data.supabase?.url || 'N/A'}</span>
+        </div>
+      `;
+      document.getElementById('adminSupabaseStats').innerHTML = supabaseHtml;
+
+      // Last generation debug
+      if (lastGenerationDebugInfo) {
+        const genSection = document.getElementById('lastGenerationDebug');
+        genSection.style.display = 'block';
+        document.getElementById('adminGenerationStats').innerHTML = `
+          <div class="admin-stat-row">
+            <span class="admin-stat-label">Generation Time</span>
+            <span class="admin-stat-value good">${lastGenerationDebugInfo.generationTime}ms</span>
+          </div>
+          <div class="admin-stat-row">
+            <span class="admin-stat-label">Model</span>
+            <span class="admin-stat-value">${lastGenerationDebugInfo.model}</span>
+          </div>
+          <div class="admin-stat-row">
+            <span class="admin-stat-label">Output Size</span>
+            <span class="admin-stat-value">${lastGenerationDebugInfo.outputDimensions?.width}x${lastGenerationDebugInfo.outputDimensions?.height}</span>
+          </div>
+          <div class="admin-stat-row">
+            <span class="admin-stat-label">Input Size</span>
+            <span class="admin-stat-value">${lastGenerationDebugInfo.inputDimensions?.width}x${lastGenerationDebugInfo.inputDimensions?.height}</span>
+          </div>
+          <div class="admin-stat-row">
+            <span class="admin-stat-label">Watermark</span>
+            <span class="admin-stat-value ${lastGenerationDebugInfo.watermarkApplied ? 'warn' : 'good'}">${lastGenerationDebugInfo.watermarkApplied ? 'Yes' : 'No'}</span>
+          </div>
+        `;
+      }
+    }
+
+    // Refresh debug panel
+    async function refreshDebugPanel() {
+      const data = await fetchDebugInfo();
+      if (data) {
+        renderDebugStats(data);
+      }
+    }
+
+    // Format helpers
+    function formatUptime(seconds) {
+      if (!seconds) return 'N/A';
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      if (hrs > 0) return `${hrs}h ${mins}m`;
+      if (mins > 0) return `${mins}m ${secs}s`;
+      return `${secs}s`;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return 'N/A';
+      const mb = bytes / (1024 * 1024);
+      return mb.toFixed(1) + ' MB';
+    }
+
+    // Show admin login modal
+    function showAdminLogin() {
+      adminOverlay.classList.add('visible');
+      adminPasswordInput.value = '';
+      adminLoginError.classList.remove('visible');
+      setTimeout(() => adminPasswordInput.focus(), 100);
+    }
+
+    // Hide admin login modal
+    function hideAdminLogin() {
+      adminOverlay.classList.remove('visible');
+    }
+
+    // Toggle admin panel visibility
+    function toggleAdminPanel() {
+      adminPanelVisible = !adminPanelVisible;
+      if (adminPanelVisible) {
+        adminPanel.classList.add('visible');
+        refreshDebugPanel();
+      } else {
+        adminPanel.classList.remove('visible');
+      }
+    }
+
+    // Initialize admin
+    async function initAdmin() {
+      // Check for ?admin=PASSWORD in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const adminPassword = urlParams.get('admin');
+
+      if (adminPassword) {
+        try {
+          await adminLogin(adminPassword);
+          updateAdminUI(true);
+          // Clean URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          showToast('Admin mode activated');
+        } catch (err) {
+          console.error('URL admin login failed:', err.message);
+        }
+      } else if (adminToken) {
+        // Check if stored token is still valid
+        const isValid = await checkAdminStatus();
+        updateAdminUI(isValid);
+        if (!isValid) {
+          localStorage.removeItem('trumpswap_admin_token');
+          adminToken = null;
+        }
+      }
+    }
+
+    // Admin event listeners
+    adminBadge.addEventListener('click', toggleAdminPanel);
+
+    adminCloseBtn.addEventListener('click', hideAdminLogin);
+
+    adminOverlay.addEventListener('click', (e) => {
+      if (e.target === adminOverlay) hideAdminLogin();
+    });
+
+    adminLoginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = adminPasswordInput.value.trim();
+
+      if (!password) {
+        adminLoginError.textContent = 'Password is required';
+        adminLoginError.classList.add('visible');
+        return;
+      }
+
+      adminLoginBtn.disabled = true;
+      adminLoginBtn.textContent = 'Logging in...';
+      adminLoginError.classList.remove('visible');
+
+      try {
+        await adminLogin(password);
+        updateAdminUI(true);
+        showToast('Admin mode activated');
+      } catch (err) {
+        adminLoginError.textContent = err.message;
+        adminLoginError.classList.add('visible');
+      } finally {
+        adminLoginBtn.disabled = false;
+        adminLoginBtn.textContent = 'Login';
+      }
+    });
+
+    adminLogoutBtn.addEventListener('click', () => {
+      adminLogout();
+      showToast('Admin mode deactivated');
+    });
+
+    refreshDebugBtn.addEventListener('click', refreshDebugPanel);
+
+    // Keyboard shortcut: Ctrl+Shift+A for admin login
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        if (adminToken) {
+          toggleAdminPanel();
+        } else {
+          showAdminLogin();
+        }
+      }
+      // Escape to close panels
+      if (e.key === 'Escape') {
+        if (adminOverlay.classList.contains('visible')) {
+          hideAdminLogin();
+        }
+        if (adminPanel.classList.contains('visible')) {
+          adminPanel.classList.remove('visible');
+          adminPanelVisible = false;
+        }
+      }
+    });
+
+    // =====================================================
+    // INITIALIZATION
+    // =====================================================
     async function init() {
       updateUsageBadge();
       updateDebugToggle();
-      await loadGallery();
+      await Promise.all([
+        initAuth(),
+        initAdmin(),
+        loadGallery()
+      ]);
     }
 
     async function loadGallery() {
@@ -511,16 +2128,16 @@
 
     uploadZone.addEventListener('dragover', (e) => {
       e.preventDefault();
-      uploadZone.style.borderColor = '#ef4444';
+      uploadZone.classList.add('dragover');
     });
 
     uploadZone.addEventListener('dragleave', () => {
-      uploadZone.style.borderColor = '';
+      uploadZone.classList.remove('dragover');
     });
 
     uploadZone.addEventListener('drop', (e) => {
       e.preventDefault();
-      uploadZone.style.borderColor = '';
+      uploadZone.classList.remove('dragover');
       if (e.dataTransfer.files.length) {
         handleFile(e.dataTransfer.files[0]);
       }
@@ -557,6 +2174,31 @@
       generateBtn.disabled = !canGenerate;
     }
 
+    // Loading message cycling
+    function startLoadingMessages() {
+      let messageIndex = 0;
+      updateLoadingMessage(messageIndex);
+
+      loadingInterval = setInterval(() => {
+        messageIndex = Math.min(messageIndex + 1, loadingMessages.length - 1);
+        updateLoadingMessage(messageIndex);
+      }, 6000);
+    }
+
+    function updateLoadingMessage(index) {
+      const msg = loadingMessages[index];
+      loadingTitle.textContent = msg.title;
+      loadingSubtitle.textContent = msg.subtitle;
+      loadingTips.textContent = msg.tip;
+    }
+
+    function stopLoadingMessages() {
+      if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
+      }
+    }
+
     // Generate
     generateBtn.addEventListener('click', async () => {
       if (!selectedPhoto || !userFile) return;
@@ -569,6 +2211,7 @@
       hideError();
       mainContent.style.display = 'none';
       loading.classList.add('visible');
+      startLoadingMessages();
 
       const formData = new FormData();
       formData.append('userPhoto', userFile);
@@ -576,10 +2219,25 @@
       formData.append('debug', debugMode);
 
       try {
-        const res = await fetch('/api/generate', {
+        // Build request options with auth header if logged in
+        const token = getAuthToken();
+        const fetchOptions = {
           method: 'POST',
-          body: formData
-        });
+          body: formData,
+          headers: {}
+        };
+
+        // Add Authorization header if we have a token
+        if (token) {
+          fetchOptions.headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Add admin token if logged in as admin
+        if (adminToken) {
+          fetchOptions.headers['X-Admin-Token'] = adminToken;
+        }
+
+        const res = await fetch('/api/generate', fetchOptions);
 
         const data = await res.json();
 
@@ -587,19 +2245,36 @@
           throw new Error(data.error);
         }
 
-        // Increment usage (unless debug)
-        if (!debugMode) {
-          usageCount++;
-          localStorage.setItem('trumpswap_usage', usageCount.toString());
-          updateUsageBadge();
+        // Capture debug info for admin panel
+        if (data.debug) {
+          lastGenerationDebugInfo = data.debug;
+          if (adminPanelVisible) {
+            refreshDebugPanel();
+          }
         }
 
+        // Increment usage (unless debug)
+        if (!debugMode) {
+          if (currentUser) {
+            // Logged in - refresh usage from server
+            serverUsageCount++;
+            updateAuthUI();
+          } else {
+            // Not logged in - use local storage
+            usageCount++;
+            localStorage.setItem('trumpswap_usage', usageCount.toString());
+            updateUsageBadge();
+          }
+        }
+
+        stopLoadingMessages();
         resultImage.src = data.imageUrl;
         loading.classList.remove('visible');
         result.classList.add('visible');
         result.classList.add('animate-in');
 
       } catch (err) {
+        stopLoadingMessages();
         loading.classList.remove('visible');
         mainContent.style.display = 'block';
         showError(err.message);
@@ -613,6 +2288,68 @@
       link.download = 'trumpswap-' + Date.now() + '.png';
       link.click();
     });
+
+    // Share
+    shareBtn.addEventListener('click', async () => {
+      const imageUrl = resultImage.src;
+
+      // Try native share API first (mobile)
+      if (navigator.share && navigator.canShare) {
+        try {
+          // Try to share the image directly if supported
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const file = new File([blob], 'trumpswap.png', { type: 'image/png' });
+
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: 'Check out my Trump Swap!',
+              text: 'I made this with Trump Swap',
+              files: [file]
+            });
+            return;
+          }
+        } catch (e) {
+          // Fall through to URL sharing
+        }
+
+        // Fall back to sharing URL
+        try {
+          await navigator.share({
+            title: 'Check out my Trump Swap!',
+            text: 'I made this with Trump Swap',
+            url: window.location.href
+          });
+          return;
+        } catch (e) {
+          // User cancelled or error, fall through to clipboard
+        }
+      }
+
+      // Fallback: copy image URL to clipboard
+      try {
+        await navigator.clipboard.writeText(imageUrl);
+        showToast('Image link copied!');
+      } catch (e) {
+        // Final fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = imageUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showToast('Image link copied!');
+      }
+    });
+
+    // Toast notification
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
+    }
 
     // Try another
     anotherBtn.addEventListener('click', () => {

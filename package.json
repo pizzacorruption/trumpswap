@@ -9,7 +9,11 @@
     "server": "node server.js",
     "dev": "node server.js",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test:unit": "node tests/unit.test.js",
+    "test:api": "node tests/api.test.js",
+    "test:integration": "node tests/integration.test.js",
+    "test:all": "node tests/unit.test.js && node tests/integration.test.js"
   },
   "keywords": [
     "ai",
@@ -22,11 +26,15 @@
   "type": "commonjs",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.47.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "formidable": "^3.5.2",
     "multer": "^2.0.2",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "stripe": "^14.25.0",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

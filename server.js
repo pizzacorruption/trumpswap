@@ -12,11 +12,372 @@ const fs = require('fs');
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+// Services
+const generations = require('./services/generations');
+const stripeService = require('./services/stripe');
+const { checkUsage, incrementUsage, getAnonymousStats } = require('./services/usage');
+
+// Middleware
+const { authMiddleware, requireAuth } = require('./middleware/auth');
+const { createRateLimitMiddleware, getClientIP } = require('./middleware/rateLimit');
+
+// Lib & Config
+const { supabase, getClientConfig } = require('./lib/supabase');
+const tiers = require('./config/tiers');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// API timeout for Gemini requests (in milliseconds)
+const GEMINI_TIMEOUT = 120000; // 2 minutes
+
+// Minimum image dimensions
+const MIN_IMAGE_SIZE = 256;
+
+// Error codes for client handling
+const ERROR_CODES = {
+  NO_FACE: 'NO_FACE',
+  MULTIPLE_FACES: 'MULTIPLE_FACES',
+  IMAGE_TOO_SMALL: 'IMAGE_TOO_SMALL',
+  SAFETY_BLOCK: 'SAFETY_BLOCK',
+  RATE_LIMITED: 'RATE_LIMITED',
+  TIMEOUT: 'TIMEOUT',
+  INVALID_FORMAT: 'INVALID_FORMAT',
+  GENERATION_FAILED: 'GENERATION_FAILED',
+};
+
+// Admin password for debug mode
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
+
+// In-memory admin sessions (token -> expiry timestamp)
+const adminSessions = new Map();
+
+/**
+ * Create structured error response
+ */
+function createErrorResponse(code, message, details = null) {
+  const response = {
+    error: message,
+    code: code,
+  };
+  if (details) {
+    response.details = details;
+  }
+  return response;
+}
+
+/**
+ * Log error with full details server-side
+ */
+function logError(code, message, error = null) {
+  console.error(`\n❌ [${code}] ${message}`);
+  if (error) {
+    console.error(`   Details: ${error.message || error}`);
+    if (error.stack) {
+      console.error(`   Stack: ${error.stack.split('\n').slice(0, 3).join('\n')}`);
+    }
+  }
+}
+
+/**
+ * Validate image dimensions and quality
+ */
+async function validateImageDimensions(buffer, filename = 'image') {
+  try {
+    const metadata = await sharp(buffer).metadata();
+    const { width, height } = metadata;
+
+    if (!width || !height) {
+      return {
+        valid: false,
+        code: ERROR_CODES.INVALID_FORMAT,
+        message: 'Could not read image dimensions. The file may be corrupted.',
+      };
+    }
+
+    if (width < MIN_IMAGE_SIZE || height < MIN_IMAGE_SIZE) {
+      return {
+        valid: false,
+        code: ERROR_CODES.IMAGE_TOO_SMALL,
+        message: `Image is too small (${width}x${height}). Minimum size is ${MIN_IMAGE_SIZE}x${MIN_IMAGE_SIZE} pixels.`,
+        details: `Your image: ${width}x${height}px. Required: at least ${MIN_IMAGE_SIZE}x${MIN_IMAGE_SIZE}px for good results.`,
+      };
+    }
+
+    return { valid: true, width, height };
+  } catch (error) {
+    return {
+      valid: false,
+      code: ERROR_CODES.INVALID_FORMAT,
+      message: 'Could not process image. Please use a valid JPG, PNG, or WebP file.',
+      details: error.message,
+    };
+  }
+}
+
+/**
+ * Parse Gemini API error and return appropriate error response
+ */
+function parseGeminiError(error) {
+  const errorMessage = error.message?.toLowerCase() || '';
+  const errorString = String(error).toLowerCase();
+
+  // Rate limiting
+  if (errorMessage.includes('rate') || errorMessage.includes('quota') ||
+      errorMessage.includes('429') || errorString.includes('resource exhausted')) {
+    return {
+      code: ERROR_CODES.RATE_LIMITED,
+      message: 'Too many requests. Please wait a moment and try again.',
+      details: 'The AI service is temporarily rate limited. Try again in 30-60 seconds.',
+    };
+  }
+
+  // Timeout
+  if (errorMessage.includes('timeout') || errorMessage.includes('deadline') ||
+      errorMessage.includes('econnreset') || errorMessage.includes('socket hang up')) {
+    return {
+      code: ERROR_CODES.TIMEOUT,
+      message: 'Request timed out. The AI is busy - please try again.',
+      details: 'Image generation took too long. This can happen during high traffic.',
+    };
+  }
+
+  // Safety/content filters
+  if (errorMessage.includes('safety') || errorMessage.includes('blocked') ||
+      errorMessage.includes('harmful') || errorMessage.includes('policy')) {
+    return {
+      code: ERROR_CODES.SAFETY_BLOCK,
+      message: 'Content blocked by safety filters. Please try a different photo.',
+      details: 'The AI detected potentially problematic content in the request.',
+    };
+  }
+
+  // Invalid image/format
+  if (errorMessage.includes('invalid') && (errorMessage.includes('image') || errorMessage.includes('format'))) {
+    return {
+      code: ERROR_CODES.INVALID_FORMAT,
+      message: 'Invalid image format. Please use a JPG, PNG, or WebP file.',
+      details: error.message,
+    };
+  }
+
+  // Default to generation failed
+  return {
+    code: ERROR_CODES.GENERATION_FAILED,
+    message: 'Image generation failed. Please try again.',
+    details: error.message,
+  };
+}
+
+/**
+ * Analyze response for face detection issues
+ */
+function analyzeResponseForFaceIssues(response) {
+  const textContent = [];
+
+  if (response.candidates?.[0]?.content?.parts) {
+    for (const part of response.candidates[0].content.parts) {
+      if (part.text) {
+        textContent.push(part.text.toLowerCase());
+      }
+    }
+  }
+
+  const fullText = textContent.join(' ');
+
+  // Check for no face detected
+  if (fullText.includes('no face') || fullText.includes('cannot detect') ||
+      fullText.includes('unable to detect') || fullText.includes('no person') ||
+      fullText.includes("couldn't find") || fullText.includes('face not found')) {
+    return {
+      hasFaceIssue: true,
+      code: ERROR_CODES.NO_FACE,
+      message: 'No face detected in your photo. Please upload a clear photo of your face.',
+      details: 'Make sure your face is clearly visible, well-lit, and facing the camera.',
+    };
+  }
+
+  // Check for multiple faces
+  if (fullText.includes('multiple faces') || fullText.includes('more than one face') ||
+      fullText.includes('several faces') || fullText.includes('multiple people')) {
+    return {
+      hasFaceIssue: true,
+      code: ERROR_CODES.MULTIPLE_FACES,
+      message: 'Multiple faces detected. Please upload a photo with only your face.',
+      details: 'Crop your photo to show just one person for best results.',
+    };
+  }
+
+  return { hasFaceIssue: false };
+}
+
+// ===== ADMIN DEBUG MODE HELPERS =====
+
+/**
+ * Generate a random admin session token
+ */
+function generateAdminToken() {
+  return require('crypto').randomBytes(32).toString('hex');
+}
+
+/**
+ * Validate admin password and create session
+ * @param {string} password - The password to validate
+ * @returns {object} Session info or error
+ */
+function validateAdminPassword(password) {
+  if (!ADMIN_PASSWORD) {
+    return { valid: false, error: 'Admin mode not configured' };
+  }
+
+  if (password !== ADMIN_PASSWORD) {
+    return { valid: false, error: 'Invalid password' };
+  }
+
+  // Create session token (valid for 24 hours)
+  const token = generateAdminToken();
+  const expiresAt = Date.now() + (24 * 60 * 60 * 1000);
+  adminSessions.set(token, expiresAt);
+
+  // Clean up expired sessions periodically
+  for (const [t, expiry] of adminSessions.entries()) {
+    if (expiry < Date.now()) {
+      adminSessions.delete(t);
+    }
+  }
+
+  return { valid: true, token, expiresAt };
+}
+
+/**
+ * Check if admin token is valid
+ * @param {string} token - The admin session token
+ * @returns {boolean} Whether the token is valid
+ */
+function isValidAdminToken(token) {
+  if (!token || !adminSessions.has(token)) {
+    return false;
+  }
+
+  const expiresAt = adminSessions.get(token);
+  if (expiresAt < Date.now()) {
+    adminSessions.delete(token);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Middleware to check admin status from header or query param
+ */
+function checkAdminMiddleware(req, res, next) {
+  // Check for admin token in header or query
+  const token = req.headers['x-admin-token'] || req.query.adminToken;
+  req.isAdmin = isValidAdminToken(token);
+  next();
+}
+
+/**
+ * Get debug info for admin responses
+ */
+function getAdminDebugInfo() {
+  const anonymousStats = getAnonymousStats();
+  const photos = getTrumpPhotos();
+
+  return {
+    server: {
+      uptime: process.uptime(),
+      nodeVersion: process.version,
+      memoryUsage: process.memoryUsage(),
+      platform: process.platform
+    },
+    config: {
+      apiKeySet: !!process.env.GEMINI_API_KEY,
+      stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
+      supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
+      adminConfigured: !!ADMIN_PASSWORD,
+      model: 'gemini-2.0-flash-exp',
+      timeout: GEMINI_TIMEOUT,
+      minImageSize: MIN_IMAGE_SIZE
+    },
+    stats: {
+      trumpPhotosCount: photos.length,
+      anonymousUsersTracked: anonymousStats.totalTracked,
+      activeAdminSessions: adminSessions.size
+    },
+    supabase: {
+      connected: !!supabase,
+      url: process.env.SUPABASE_URL ? 'configured' : 'not set'
+    }
+  };
+}
+
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// ===== SUPABASE PROFILE HELPERS =====
+
+/**
+ * Get user profile from Supabase
+ * @param {string} userId - User ID
+ * @returns {object|null} User profile or null
+ */
+async function getProfile(userId) {
+  if (!supabase || !userId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching profile:', error.message);
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Profile fetch error:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Update user profile in Supabase
+ * @param {string} userId - User ID
+ * @param {object} updates - Fields to update
+ * @returns {boolean} Success status
+ */
+async function updateProfile(userId, updates) {
+  if (!supabase || !userId) return false;
+
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error updating profile:', error.message);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Profile update error:', err.message);
+    return false;
+  }
+}
+
+// Create rate limit middleware with Supabase integration
+const rateLimitMiddleware = createRateLimitMiddleware({
+  upgradeUrl: '/pricing',
+  getProfile,
+  updateProfile
+});
 
 // Middleware
 app.use(cors());
@@ -24,6 +385,12 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/output', express.static('output'));
 app.use('/trump-photos', express.static('public/trump-photos'));
+
+// Apply auth middleware globally (non-blocking, just attaches user info)
+app.use(authMiddleware);
+
+// Apply admin check middleware globally
+app.use(checkAdminMiddleware);
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -35,10 +402,42 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Use JPG, PNG, or WebP.'));
+      const error = new Error('Invalid file type. Please use JPG, PNG, or WebP images.');
+      error.code = ERROR_CODES.INVALID_FORMAT;
+      error.details = `Received: ${file.mimetype}. Accepted: image/jpeg, image/png, image/webp`;
+      cb(error);
     }
   }
 });
+
+// Multer error handling middleware
+function handleMulterError(err, req, res, next) {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      logError(ERROR_CODES.INVALID_FORMAT, 'File too large', err);
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.INVALID_FORMAT,
+        'File is too large. Maximum size is 10MB.',
+        'Try compressing your image or using a smaller resolution.'
+      ));
+    }
+    logError(ERROR_CODES.INVALID_FORMAT, 'Upload error', err);
+    return res.status(400).json(createErrorResponse(
+      ERROR_CODES.INVALID_FORMAT,
+      'File upload error. Please try again.',
+      err.message
+    ));
+  }
+  if (err?.code === ERROR_CODES.INVALID_FORMAT) {
+    logError(ERROR_CODES.INVALID_FORMAT, err.message, err);
+    return res.status(400).json(createErrorResponse(
+      ERROR_CODES.INVALID_FORMAT,
+      err.message,
+      err.details
+    ));
+  }
+  next(err);
+}
 
 // Ensure directories exist
 ['output', 'public/trump-photos'].forEach(dir => {
@@ -48,22 +447,23 @@ const upload = multer({
 });
 
 /**
- * Add watermark to image buffer
+ * Add watermark to image buffer - subtle horizontal style like SHOWFEETS
  */
 async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
-  // Create SVG text overlay (diagonal, semi-transparent)
-  const fontSize = Math.floor(Math.min(width, height) / 8);
+  // Subtle horizontal watermark - smaller, more transparent
+  const fontSize = Math.floor(Math.min(width, height) / 18);
   const svgText = `
     <svg width="${width}" height="${height}">
       <style>
         .watermark {
-          fill: rgba(255, 255, 255, 0.25);
+          fill: rgba(255, 255, 255, 0.15);
           font-size: ${fontSize}px;
           font-family: Arial, sans-serif;
           font-weight: bold;
+          letter-spacing: 0.1em;
         }
       </style>
       <text
@@ -72,7 +472,6 @@ async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
         text-anchor="middle"
         dominant-baseline="middle"
         class="watermark"
-        transform="rotate(-30, ${width/2}, ${height/2})"
       >${watermarkText}</text>
     </svg>
   `;
@@ -116,23 +515,59 @@ app.get('/api/photos', (req, res) => {
 });
 
 // API: Generate face swap
-app.post('/api/generate', upload.single('userPhoto'), async (req, res) => {
+// Apply upload, then rate limit middleware (which checks usage limits)
+app.post('/api/generate', upload.single('userPhoto'), handleMulterError, rateLimitMiddleware, async (req, res) => {
+  // Track generation for authenticated users
+  let generationRecord = null;
+  const userId = req.user?.id || null;
+  const clientIP = getClientIP(req);
+
   try {
     const userPhoto = req.file;
     const { trumpPhoto, debug } = req.body;
 
     if (!userPhoto) {
-      return res.status(400).json({ error: 'Your photo is required' });
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.INVALID_FORMAT,
+        'Your photo is required',
+        'Please upload a photo of yourself.'
+      ));
     }
 
     if (!trumpPhoto) {
-      return res.status(400).json({ error: 'Trump photo selection is required' });
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.INVALID_FORMAT,
+        'Trump photo selection is required',
+        'Please select a Trump photo from the gallery.'
+      ));
+    }
+
+    // Validate user photo dimensions
+    const userValidation = await validateImageDimensions(userPhoto.buffer, 'User photo');
+    if (!userValidation.valid) {
+      logError(userValidation.code, userValidation.message);
+      return res.status(400).json(createErrorResponse(
+        userValidation.code,
+        userValidation.message,
+        userValidation.details
+      ));
+    }
+
+    // Create generation record for tracking (for authenticated users)
+    if (userId) {
+      generationRecord = generations.createGeneration(userId, trumpPhoto);
+      console.log(`   Generation ID: ${generationRecord.id}`);
     }
 
     // Read the Trump photo from disk
     const trumpPhotoPath = path.join(__dirname, 'public', trumpPhoto);
     if (!fs.existsSync(trumpPhotoPath)) {
-      return res.status(400).json({ error: 'Selected Trump photo not found' });
+      logError(ERROR_CODES.GENERATION_FAILED, `Trump photo not found: ${trumpPhoto}`);
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.GENERATION_FAILED,
+        'Selected Trump photo not found.',
+        'Please refresh the page and try again.'
+      ));
     }
 
     const trumpPhotoBuffer = fs.readFileSync(trumpPhotoPath);
@@ -140,64 +575,112 @@ app.post('/api/generate', upload.single('userPhoto'), async (req, res) => {
 
     console.log(`\n🎬 Generating Trump swap...`);
     console.log(`   Trump photo: ${trumpPhoto}`);
+    console.log(`   User photo: ${userValidation.width}x${userValidation.height}px`);
 
     // Get the model - Nano Banana Pro (Gemini 3 Pro Image)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-2.0-flash-exp',
       generationConfig: {
         responseModalities: ['image', 'text'],
       },
     });
 
-    // Create the prompt - replace the WHOLE PERSON next to Trump
-    const prompt = `PERSON REPLACEMENT TASK:
+    // Create the prompt - replace the WHOLE PERSON next to Trump, KEEP THEIR CLOTHES
+    const prompt = `COMPOSITE PHOTO TASK
 
-IMAGE 1: Photo of Donald Trump with another person
-IMAGE 2: Photo of the person who should appear next to Trump instead
+Look at these two images:
+- IMAGE 1: Trump with someone else
+- IMAGE 2: A person in casual clothes
 
-TASK: Replace the person standing with Trump (not Trump himself) with the person from IMAGE 2.
+Create a NEW composite image where the person from IMAGE 2 is standing next to Trump instead of whoever was there before.
 
-INSTRUCTIONS:
-- Remove the other person from IMAGE 1 entirely
-- Insert the person from IMAGE 2 in their place, standing next to Trump
-- The person from IMAGE 2 should appear with their own body, clothes, and appearance
-- Keep Trump exactly as he is
-- Keep the same background and setting from IMAGE 1
-- Make it look like a natural photo of Trump standing with the person from IMAGE 2
-- Match the lighting and scale so it looks realistic
+⚠️ MOST IMPORTANT RULE - CLOTHING:
+The person from IMAGE 2 must wear EXACTLY what they're wearing in their photo. If IMAGE 2 shows them in a t-shirt, jeans, hoodie, or any casual outfit - they MUST appear in that SAME outfit in the final image. Do NOT dress them in a suit. Do NOT make them look formal. Copy their exact outfit from IMAGE 2.
 
-Generate the edited photo showing Trump with the new person.`;
+This is meant to be FUNNY - someone in casual everyday clothes standing next to Trump in a formal setting. The humor comes from the contrast. Preserve their casual clothes!
 
-    // Make API request with both images
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: trumpPhotoMime,
-          data: trumpPhotoBuffer.toString('base64'),
+Other rules:
+- Trump stays exactly as he is
+- Background from IMAGE 1 stays
+- Make lighting look natural
+- Person from IMAGE 2 keeps their face, hair, glasses, body type
+
+Generate the composite image with the person wearing their ORIGINAL CLOTHES from IMAGE 2.`;
+
+    // Make API request with both images (with timeout protection)
+    let result;
+    const startTime = Date.now();
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          const error = new Error('Request timed out');
+          error.isTimeout = true;
+          reject(error);
+        }, GEMINI_TIMEOUT);
+      });
+
+      const generatePromise = model.generateContent([
+        {
+          inlineData: {
+            mimeType: trumpPhotoMime,
+            data: trumpPhotoBuffer.toString('base64'),
+          },
         },
-      },
-      {
-        inlineData: {
-          mimeType: userPhoto.mimetype,
-          data: userPhoto.buffer.toString('base64'),
+        {
+          inlineData: {
+            mimeType: userPhoto.mimetype,
+            data: userPhoto.buffer.toString('base64'),
+          },
         },
-      },
-      prompt,
-    ]);
+        prompt,
+      ]);
+
+      result = await Promise.race([generatePromise, timeoutPromise]);
+    } catch (apiError) {
+      // Handle timeout specifically
+      if (apiError.isTimeout) {
+        logError(ERROR_CODES.TIMEOUT, 'Gemini API timed out', apiError);
+        if (generationRecord) {
+          generations.failGeneration(generationRecord.id, ERROR_CODES.TIMEOUT, 'Request timed out');
+        }
+        return res.status(504).json(createErrorResponse(
+          ERROR_CODES.TIMEOUT,
+          'Request timed out. The AI is taking too long - please try again.',
+          `Generation exceeded ${GEMINI_TIMEOUT / 1000} second limit. This can happen during high traffic.`
+        ));
+      }
+      // Re-throw to be caught by outer catch
+      throw apiError;
+    }
 
     const response = await result.response;
+    const elapsedTime = Date.now() - startTime;
+
+    // Check for prompt feedback blocks (happens before generation)
+    if (response.promptFeedback?.blockReason) {
+      logError(ERROR_CODES.SAFETY_BLOCK, `Prompt blocked: ${response.promptFeedback.blockReason}`);
+      if (generationRecord) {
+        generations.failGeneration(generationRecord.id, ERROR_CODES.SAFETY_BLOCK, `Prompt blocked: ${response.promptFeedback.blockReason}`);
+      }
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.SAFETY_BLOCK,
+        'Request blocked by content filters. Please try a different photo.',
+        `Block reason: ${response.promptFeedback.blockReason}`
+      ));
+    }
 
     // Extract generated image
     if (response.candidates && response.candidates[0]) {
-      const parts = response.candidates[0].content.parts;
+      const parts = response.candidates[0].content?.parts || [];
 
       for (const part of parts) {
         if (part.inlineData) {
           let imageBuffer = Buffer.from(part.inlineData.data, 'base64');
 
-          // Add watermark (skip in debug mode)
+          // Add watermark (skip in debug mode or for admin users)
           const isDebug = debug === 'true' || debug === true;
-          if (!isDebug) {
+          const skipWatermark = isDebug || req.isAdmin;
+          if (!skipWatermark) {
             imageBuffer = await addWatermark(imageBuffer);
           }
 
@@ -206,38 +689,499 @@ Generate the edited photo showing Trump with the new person.`;
           const outputPath = path.join('output', filename);
           fs.writeFileSync(outputPath, imageBuffer);
 
-          console.log(`✅ Generated: ${filename}${isDebug ? ' (no watermark - debug)' : ''}`);
+          console.log(`✅ Generated: ${filename}${isDebug ? ' (no watermark - debug)' : ''}${req.isAdmin ? ' [ADMIN]' : ''} (${elapsedTime}ms)`);
 
-          return res.json({
+          // Mark generation as completed for authenticated users
+          if (generationRecord) {
+            generations.completeGeneration(generationRecord.id, `/output/${filename}`);
+          }
+
+          // Build response
+          const response = {
             success: true,
-            imageUrl: `/output/${filename}`
-          });
+            imageUrl: `/output/${filename}`,
+            generationId: generationRecord?.id || null
+          };
+
+          // Add debug info for admin users
+          if (req.isAdmin) {
+            const outputMetadata = await sharp(imageBuffer).metadata();
+            response.debug = {
+              generationTime: elapsedTime,
+              model: 'gemini-2.0-flash-exp',
+              outputDimensions: {
+                width: outputMetadata.width,
+                height: outputMetadata.height
+              },
+              inputDimensions: {
+                width: userValidation.width,
+                height: userValidation.height
+              },
+              watermarkApplied: !skipWatermark,
+              trumpPhoto: trumpPhoto,
+              timestamp: new Date().toISOString()
+            };
+          }
+
+          return res.json(response);
         }
       }
     }
 
     // Check for safety blocks
     if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+      logError(ERROR_CODES.SAFETY_BLOCK, 'Safety filter blocked request');
+      if (generationRecord) {
+        generations.failGeneration(generationRecord.id, ERROR_CODES.SAFETY_BLOCK, 'Content blocked by safety filters');
+      }
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.SAFETY_BLOCK,
+        'Request blocked by safety filters. Try a different photo.',
+        'The AI detected potentially problematic content.'
+      ));
+    }
+
+    // Check for face detection issues in text response
+    const faceIssue = analyzeResponseForFaceIssues(response);
+    if (faceIssue.hasFaceIssue) {
+      logError(faceIssue.code, faceIssue.message);
+      if (generationRecord) {
+        generations.failGeneration(generationRecord.id, faceIssue.code, faceIssue.message);
+      }
+      return res.status(400).json(createErrorResponse(
+        faceIssue.code,
+        faceIssue.message,
+        faceIssue.details
+      ));
+    }
+
+    // No image generated
+    logError(ERROR_CODES.GENERATION_FAILED, 'No image in response');
+    if (generationRecord) {
+      generations.failGeneration(generationRecord.id, ERROR_CODES.GENERATION_FAILED, 'No image generated');
+    }
+    res.status(500).json(createErrorResponse(
+      ERROR_CODES.GENERATION_FAILED,
+      'No image generated. Please try again.',
+      'The AI did not return an image. This can happen occasionally.'
+    ));
+
+  } catch (error) {
+    // Parse Gemini-specific errors
+    const parsedError = parseGeminiError(error);
+    logError(parsedError.code, parsedError.message, error);
+
+    // Mark generation as failed
+    if (generationRecord) {
+      generations.failGeneration(generationRecord.id, parsedError.code, parsedError.message);
+    }
+
+    // Return appropriate HTTP status based on error type
+    const statusCode = parsedError.code === ERROR_CODES.RATE_LIMITED ? 429 :
+                       parsedError.code === ERROR_CODES.TIMEOUT ? 504 :
+                       parsedError.code === ERROR_CODES.SAFETY_BLOCK ? 400 : 500;
+
+    res.status(statusCode).json(createErrorResponse(
+      parsedError.code,
+      parsedError.message,
+      parsedError.details
+    ));
+  }
+});
+
+// ===== STRIPE PAYMENT ROUTES =====
+
+/**
+ * POST /api/create-checkout
+ * Creates a Stripe checkout session for $20/mo Pro subscription
+ * Body: { userId: string, email: string }
+ */
+app.post('/api/create-checkout', async (req, res) => {
+  try {
+    const { userId, email } = req.body;
+
+    if (!userId || !email) {
       return res.status(400).json({
-        error: 'Request blocked by safety filters. Try a different photo.'
+        error: 'userId and email are required'
       });
     }
 
-    res.status(500).json({ error: 'No image generated. Try again.' });
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        error: 'Invalid email format'
+      });
+    }
 
+    const { url, sessionId } = await stripeService.createCheckoutSession(userId, email);
+
+    res.json({
+      success: true,
+      checkoutUrl: url,
+      sessionId
+    });
   } catch (error) {
-    console.error('❌ Generation error:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('Checkout creation error:', error.message);
+    res.status(500).json({
+      error: 'Failed to create checkout session',
+      details: error.message
+    });
   }
+});
+
+/**
+ * POST /api/webhook/stripe
+ * Handles Stripe webhook events (subscription updates, cancellations, etc.)
+ * NOTE: This endpoint needs raw body parsing for signature verification
+ */
+app.post('/api/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    try {
+      // Verify and construct the webhook event
+      const event = stripeService.constructWebhookEvent(req.body, signature);
+
+      console.log(`Stripe webhook received: ${event.type}`);
+
+      // Handle the event
+      const result = await stripeService.handleWebhook(event);
+
+      res.json({ received: true, ...result });
+    } catch (error) {
+      console.error('Webhook error:', error.message);
+      res.status(400).json({
+        error: 'Webhook signature verification failed',
+        details: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/subscription
+ * Returns the current user's subscription status
+ * Query: ?userId=xxx
+ */
+app.get('/api/subscription', async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        error: 'userId query parameter is required'
+      });
+    }
+
+    const status = await stripeService.getSubscriptionStatus(userId);
+
+    res.json({
+      success: true,
+      ...status
+    });
+  } catch (error) {
+    console.error('Subscription status error:', error.message);
+    res.status(500).json({
+      error: 'Failed to get subscription status',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/cancel-subscription
+ * Cancels a user's subscription (at period end)
+ * Body: { customerId: string }
+ */
+app.post('/api/cancel-subscription', async (req, res) => {
+  try {
+    const { customerId } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({
+        error: 'customerId is required'
+      });
+    }
+
+    const result = await stripeService.cancelSubscription(customerId);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Subscription cancellation error:', error.message);
+    res.status(500).json({
+      error: 'Failed to cancel subscription',
+      details: error.message
+    });
+  }
+});
+
+// ===== USER & USAGE ROUTES =====
+
+/**
+ * GET /api/me
+ * Returns current user info and usage stats
+ * Works for both authenticated and anonymous users
+ */
+app.get('/api/me', async (req, res) => {
+  try {
+    const userId = req.user?.id || null;
+    const clientIP = getClientIP(req);
+
+    // Get user profile if authenticated
+    let profile = null;
+    if (userId) {
+      profile = await getProfile(userId);
+    }
+
+    // Get usage info
+    const usage = checkUsage(userId, profile, clientIP);
+
+    // Build response
+    const response = {
+      authenticated: req.isAuthenticated,
+      user: req.user ? {
+        id: req.user.id,
+        email: req.user.email,
+        created_at: req.user.created_at
+      } : null,
+      profile: profile ? {
+        generation_count: profile.generation_count || 0,
+        subscription_status: profile.subscription_status || null,
+        stripe_customer_id: profile.stripe_customer_id || null
+      } : null,
+      usage: {
+        tier: usage.tier,
+        tierName: usage.tierName,
+        used: usage.used,
+        limit: usage.limit,
+        remaining: usage.remaining,
+        canGenerate: usage.canGenerate
+      },
+      tiers: Object.entries(tiers).map(([key, value]) => ({
+        id: key,
+        name: value.name,
+        limit: value.limit === Infinity ? 'unlimited' : value.limit,
+        description: value.description
+      }))
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error in /api/me:', error.message);
+    res.status(500).json({
+      error: 'Failed to get user info',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/generations
+ * Returns generation history for authenticated users
+ * Query: ?limit=10
+ */
+app.get('/api/generations', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+
+    const history = generations.getGenerations(userId, limit);
+
+    res.json({
+      success: true,
+      generations: history,
+      count: history.length
+    });
+  } catch (error) {
+    console.error('Error in /api/generations:', error.message);
+    res.status(500).json({
+      error: 'Failed to get generation history',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/generation/:id
+ * Returns a specific generation by ID
+ */
+app.get('/api/generation/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const generation = generations.getGeneration(id);
+
+    if (!generation) {
+      return res.status(404).json({
+        error: 'Generation not found'
+      });
+    }
+
+    // Only allow owner to view their generations (if authenticated)
+    if (generation.userId && req.user?.id !== generation.userId) {
+      return res.status(403).json({
+        error: 'Not authorized to view this generation'
+      });
+    }
+
+    res.json({
+      success: true,
+      generation
+    });
+  } catch (error) {
+    console.error('Error in /api/generation/:id:', error.message);
+    res.status(500).json({
+      error: 'Failed to get generation',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/config
+ * Returns public client configuration (Supabase URL, etc.)
+ */
+app.get('/api/config', (req, res) => {
+  const supabaseConfig = getClientConfig();
+
+  res.json({
+    supabase: {
+      url: supabaseConfig.url,
+      anonKey: supabaseConfig.anonKey
+    },
+    tiers: Object.entries(tiers).map(([key, value]) => ({
+      id: key,
+      name: value.name,
+      limit: value.limit === Infinity ? 'unlimited' : value.limit,
+      description: value.description
+    }))
+  });
 });
 
 // Health check
 app.get('/api/health', (req, res) => {
   const photos = getTrumpPhotos();
+  const anonymousStats = getAnonymousStats();
+
   res.json({
     status: 'ok',
     apiKeySet: !!process.env.GEMINI_API_KEY,
-    trumpPhotosCount: photos.length
+    stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
+    supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
+    trumpPhotosCount: photos.length,
+    anonymousUsersTracked: anonymousStats.totalTracked
+  });
+});
+
+// ===== ADMIN DEBUG MODE ROUTES =====
+
+/**
+ * POST /api/admin/login
+ * Authenticate with admin password to get session token
+ * Body: { password: string }
+ */
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({
+      error: 'Password is required'
+    });
+  }
+
+  const result = validateAdminPassword(password);
+
+  if (!result.valid) {
+    console.log('[ADMIN] Failed login attempt');
+    return res.status(401).json({
+      error: result.error
+    });
+  }
+
+  console.log('[ADMIN] Successful login, token created');
+  res.json({
+    success: true,
+    token: result.token,
+    expiresAt: result.expiresAt
+  });
+});
+
+/**
+ * POST /api/admin/logout
+ * Invalidate admin session token
+ * Header: X-Admin-Token
+ */
+app.post('/api/admin/logout', (req, res) => {
+  const token = req.headers['x-admin-token'];
+
+  if (token && adminSessions.has(token)) {
+    adminSessions.delete(token);
+    console.log('[ADMIN] Session invalidated');
+  }
+
+  res.json({ success: true });
+});
+
+/**
+ * GET /api/admin/debug
+ * Get full debug info (requires valid admin token)
+ * Header: X-Admin-Token
+ */
+app.get('/api/admin/debug', (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(401).json({
+      error: 'Admin authentication required'
+    });
+  }
+
+  const debugInfo = getAdminDebugInfo();
+
+  // Add rate limit info
+  const clientIP = getClientIP(req);
+  const userId = req.user?.id || null;
+  let profile = null;
+
+  // Async wrapper for profile fetch
+  (async () => {
+    if (userId) {
+      profile = await getProfile(userId);
+    }
+
+    const usage = checkUsage(userId, profile, clientIP);
+
+    res.json({
+      admin: true,
+      timestamp: new Date().toISOString(),
+      ...debugInfo,
+      currentRequest: {
+        clientIP,
+        userId,
+        userTier: usage.tier,
+        usageStats: {
+          used: usage.used,
+          limit: usage.limit,
+          remaining: usage.remaining,
+          canGenerate: usage.canGenerate
+        }
+      }
+    });
+  })();
+});
+
+/**
+ * GET /api/admin/status
+ * Quick check if admin token is valid
+ * Header: X-Admin-Token
+ */
+app.get('/api/admin/status', (req, res) => {
+  res.json({
+    isAdmin: req.isAdmin,
+    adminConfigured: !!ADMIN_PASSWORD
   });
 });
 
