@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trump Swap</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f23;
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #71717a;
+      font-size: 1.1rem;
+    }
+
+    .usage-badge {
+      display: inline-block;
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      margin-top: 12px;
+    }
+
+    .usage-badge.debug {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    /* Glass card */
+    .card {
+      background: rgba(26, 26, 46, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #a1a1aa;
+    }
+
+    /* Photo gallery grid */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .gallery-item {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .gallery-item:hover {
+      border-color: rgba(239, 68, 68, 0.5);
+      transform: scale(1.02);
+    }
+
+    .gallery-item.selected {
+      border-color: #ef4444;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .gallery-item .check {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      background: #ef4444;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .gallery-item.selected .check {
+      display: flex;
+    }
+
+    .btn-random {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+
+    .btn-random:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed rgba(239, 68, 68, 0.4);
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-zone:hover {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .upload-zone.has-file {
+      border-color: #22c55e;
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+    }
+
+    .upload-text {
+      color: #a1a1aa;
+      margin-bottom: 4px;
+    }
+
+    .upload-hint {
+      color: #52525b;
+      font-size: 0.85rem;
+    }
+
+    .preview-container {
+      display: none;
+      margin-top: 16px;
+    }
+
+    .preview-container.visible {
+      display: block;
+    }
+
+    .preview-img {
+      max-width: 150px;
+      max-height: 150px;
+      border-radius: 8px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    /* Generate button */
+    .btn-generate {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-generate:hover:not(:disabled) {
+      background: #dc2626;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+    }
+
+    .btn-generate:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Loading */
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .loading.visible {
+      display: block;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #ef4444;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Result */
+    .result {
+      display: none;
+      text-align: center;
+    }
+
+    .result.visible {
+      display: block;
+    }
+
+    .result img {
+      max-width: 100%;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-download {
+      background: #22c55e;
+      color: #fff;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-download:hover {
+      background: #16a34a;
+    }
+
+    .btn-another {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 12px 24px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-another:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Error */
+    .error {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .error.visible {
+      display: block;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      color: #52525b;
+      font-size: 0.85rem;
+    }
+
+    /* Debug toggle */
+    .debug-toggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: #71717a;
+      cursor: pointer;
+    }
+
+    .debug-toggle:hover {
+      color: #fff;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in {
+      animation: fadeInUp 0.3s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Trump Swap</h1>
+      <p class="subtitle">Put yourself next to the Donald</p>
+      <div class="usage-badge" id="usageBadge">3 swaps remaining</div>
+    </header>
+
+    <div id="mainContent">
+      <div class="error" id="error"></div>
+
+      <!-- Step 1: Pick a Trump photo -->
+      <div class="card">
+        <div class="card-title">1. Pick a Trump photo</div>
+        <div class="gallery" id="gallery">
+          <!-- Photos loaded dynamically -->
+        </div>
+        <button class="btn-random" id="randomBtn">🎲 Surprise me</button>
+      </div>
+
+      <!-- Step 2: Upload your face -->
+      <div class="card">
+        <div class="card-title">2. Upload your face</div>
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-icon">📸</div>
+          <div class="upload-text">Drop your photo here or click to upload</div>
+          <div class="upload-hint">Clear face shot works best</div>
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
+        </div>
+        <div class="preview-container" id="previewContainer">
+          <img class="preview-img" id="previewImg" alt="Your photo">
+        </div>
+      </div>
+
+      <!-- Generate -->
+      <button class="btn-generate" id="generateBtn" disabled>
+        Swap Faces 🔄
+      </button>
+    </div>
+
+    <!-- Loading state -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Swapping faces...</p>
+      <p style="color: #71717a; font-size: 0.9rem; margin-top: 8px;">This takes 15-30 seconds</p>
+    </div>
+
+    <!-- Result -->
+    <div class="card result" id="result">
+      <img id="resultImage" alt="Your Trump swap">
+      <div class="result-actions">
+        <button class="btn-download" id="downloadBtn">Download 📥</button>
+        <button class="btn-another" id="anotherBtn">Try Another</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>For entertainment purposes only • Images may contain watermark</p>
+  </footer>
+
+  <div class="debug-toggle" id="debugToggle">Debug: OFF</div>
+
+  <script>
+    // State
+    let selectedPhoto = null;
+    let userFile = null;
+    let usageCount = parseInt(localStorage.getItem('trumpswap_usage') || '0');
+    let debugMode = localStorage.getItem('trumpswap_debug') === 'true';
+    const MAX_USAGE = 3;
+
+    // Elements
+    const gallery = document.getElementById('gallery');
+    const randomBtn = document.getElementById('randomBtn');
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImg = document.getElementById('previewImg');
+    const generateBtn = document.getElementById('generateBtn');
+    const mainContent = document.getElementById('mainContent');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const resultImage = document.getElementById('resultImage');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const anotherBtn = document.getElementById('anotherBtn');
+    const errorDiv = document.getElementById('error');
+    const usageBadge = document.getElementById('usageBadge');
+    const debugToggle = document.getElementById('debugToggle');
+
+    // Trump photos (loaded from server)
+    let trumpPhotos = [];
+
+    // Initialize
+    async function init() {
+      updateUsageBadge();
+      updateDebugToggle();
+      await loadGallery();
+    }
+
+    async function loadGallery() {
+      try {
+        const res = await fetch('/api/photos');
+        const data = await res.json();
+        trumpPhotos = data.photos;
+        renderGallery();
+
+        // Auto-select random photo
+        if (trumpPhotos.length > 0) {
+          selectRandomPhoto();
+        }
+      } catch (err) {
+        showError('Failed to load gallery');
+      }
+    }
+
+    function renderGallery() {
+      gallery.innerHTML = trumpPhotos.map((photo, i) => `
+        <div class="gallery-item" data-index="${i}" data-path="${photo.path}">
+          <img src="${photo.path}" alt="${photo.name}" loading="lazy">
+          <div class="check">✓</div>
+        </div>
+      `).join('');
+
+      // Add click handlers
+      gallery.querySelectorAll('.gallery-item').forEach(item => {
+        item.addEventListener('click', () => selectPhoto(item));
+      });
+    }
+
+    function selectPhoto(item) {
+      // Remove previous selection
+      gallery.querySelectorAll('.gallery-item').forEach(i => i.classList.remove('selected'));
+
+      // Select new
+      item.classList.add('selected');
+      selectedPhoto = item.dataset.path;
+      checkReady();
+    }
+
+    function selectRandomPhoto() {
+      const items = gallery.querySelectorAll('.gallery-item');
+      if (items.length === 0) return;
+
+      const randomIndex = Math.floor(Math.random() * items.length);
+      selectPhoto(items[randomIndex]);
+    }
+
+    // Random button
+    randomBtn.addEventListener('click', selectRandomPhoto);
+
+    // Upload handling
+    uploadZone.addEventListener('click', () => fileInput.click());
+
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.style.borderColor = '#ef4444';
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.style.borderColor = '';
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.style.borderColor = '';
+      if (e.dataTransfer.files.length) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      if (!file.type.match(/image\/(jpeg|png|webp)/)) {
+        showError('Please upload a JPG, PNG, or WebP image');
+        return;
+      }
+
+      userFile = file;
+      uploadZone.classList.add('has-file');
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        previewImg.src = e.target.result;
+        previewContainer.classList.add('visible');
+      };
+      reader.readAsDataURL(file);
+
+      checkReady();
+    }
+
+    function checkReady() {
+      const canGenerate = selectedPhoto && userFile && (debugMode || usageCount < MAX_USAGE);
+      generateBtn.disabled = !canGenerate;
+    }
+
+    // Generate
+    generateBtn.addEventListener('click', async () => {
+      if (!selectedPhoto || !userFile) return;
+      if (!debugMode && usageCount >= MAX_USAGE) {
+        showError('You\'ve used all your free swaps!');
+        return;
+      }
+
+      hideError();
+      mainContent.style.display = 'none';
+      loading.classList.add('visible');
+
+      const formData = new FormData();
+      formData.append('userPhoto', userFile);
+      formData.append('trumpPhoto', selectedPhoto);
+      formData.append('debug', debugMode);
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        // Increment usage (unless debug)
+        if (!debugMode) {
+          usageCount++;
+          localStorage.setItem('trumpswap_usage', usageCount.toString());
+          updateUsageBadge();
+        }
+
+        resultImage.src = data.imageUrl;
+        loading.classList.remove('visible');
+        result.classList.add('visible');
+        result.classList.add('animate-in');
+
+      } catch (err) {
+        loading.classList.remove('visible');
+        mainContent.style.display = 'block';
+        showError(err.message);
+      }
+    });
+
+    // Download
+    downloadBtn.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = resultImage.src;
+      link.download = 'trumpswap-' + Date.now() + '.png';
+      link.click();
+    });
+
+    // Try another
+    anotherBtn.addEventListener('click', () => {
+      result.classList.remove('visible');
+      mainContent.style.display = 'block';
+
+      // Reset
+      userFile = null;
+      fileInput.value = '';
+      previewContainer.classList.remove('visible');
+      uploadZone.classList.remove('has-file');
+
+      // Pick new random photo
+      selectRandomPhoto();
+      checkReady();
+    });
+
+    // Usage badge
+    function updateUsageBadge() {
+      const remaining = MAX_USAGE - usageCount;
+      if (debugMode) {
+        usageBadge.textContent = 'Debug mode (unlimited)';
+        usageBadge.classList.add('debug');
+      } else if (remaining <= 0) {
+        usageBadge.textContent = 'No swaps remaining';
+      } else {
+        usageBadge.textContent = `${remaining} swap${remaining !== 1 ? 's' : ''} remaining`;
+        usageBadge.classList.remove('debug');
+      }
+      checkReady();
+    }
+
+    // Debug toggle (triple-click to toggle)
+    let debugClicks = 0;
+    debugToggle.addEventListener('click', () => {
+      debugClicks++;
+      if (debugClicks >= 3) {
+        debugMode = !debugMode;
+        localStorage.setItem('trumpswap_debug', debugMode.toString());
+        updateDebugToggle();
+        updateUsageBadge();
+        debugClicks = 0;
+      }
+      setTimeout(() => { debugClicks = 0; }, 1000);
+    });
+
+    function updateDebugToggle() {
+      debugToggle.textContent = `Debug: ${debugMode ? 'ON' : 'OFF'}`;
+    }
+
+    // Error handling
+    function showError(msg) {
+      errorDiv.textContent = msg;
+      errorDiv.classList.add('visible');
+    }
+
+    function hideError() {
+      errorDiv.classList.remove('visible');
+    }
+
+    // Start
+    init();
+  </script>
+</body>
+</html>

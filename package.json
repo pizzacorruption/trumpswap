@@ -1,0 +1,35 @@
+{
+  "name": "epswag",
+  "version": "1.0.0",
+  "description": "AI Celebrity Selfie Generator - Nano Banana Pro wrapper",
+  "main": "poc.js",
+  "scripts": {
+    "poc": "node poc.js",
+    "test-api": "node test-api.js",
+    "server": "node server.js",
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "next start"
+  },
+  "keywords": [
+    "ai",
+    "celebrity",
+    "selfie",
+    "gemini"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "playwright": "^1.57.0"
+  }
+}
