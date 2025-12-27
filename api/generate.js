@@ -38,7 +38,7 @@ async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
         text-anchor="middle"
         dominant-baseline="middle"
         class="watermark"
-        transform="rotate(-30, ${width/2}, ${height/2})"
+        transform="rotate(-30, ${width / 2}, ${height / 2})"
       >${watermarkText}</text>
     </svg>
   `;
@@ -93,13 +93,17 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Your photo is required' });
     }
 
+    // Validate file type by MIME and extension
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimes.includes(userPhotoFile.mimetype)) {
+      return res.status(400).json({ error: 'Only JPEG, PNG, and WebP images are allowed' });
+    }
+
     // Get trump photo selection
     const trumpPhoto = fields.trumpPhoto?.[0] || fields.trumpPhoto;
     if (!trumpPhoto) {
       return res.status(400).json({ error: 'Trump photo selection is required' });
     }
-
-    const debug = fields.debug?.[0] || fields.debug;
 
     // Read user photo buffer
     const userPhotoBuffer = fs.readFileSync(userPhotoFile.filepath);
@@ -172,17 +176,16 @@ Generate the edited photo showing Trump with the new person.`;
         if (part.inlineData) {
           let imageBuffer = Buffer.from(part.inlineData.data, 'base64');
 
-          // Add watermark (skip in debug mode)
-          const isDebug = debug === 'true' || debug === true;
-          if (!isDebug) {
-            imageBuffer = await addWatermark(imageBuffer);
-          }
+          // SECURITY: Always add watermark in serverless function
+          // Only the Express server (server.js) can verify admin/paid status
+          // Debug flag is NOT trusted to bypass watermark
+          imageBuffer = await addWatermark(imageBuffer);
 
           // Return as base64 data URL (serverless has no persistent disk)
           const base64Image = imageBuffer.toString('base64');
           const dataUrl = `data:image/png;base64,${base64Image}`;
 
-          console.log(`Generated image${isDebug ? ' (no watermark - debug)' : ''}`);
+          console.log('Generated image with watermark');
 
           return res.json({
             success: true,

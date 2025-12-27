@@ -75,17 +75,20 @@ function createRateLimitMiddleware(options = {}) {
       req.usage = usage;
       req.clientIP = ipAddress;
 
-      // Check if user can generate
+      // Check if user can generate - MUST reject BEFORE any API call
       if (!usage.canGenerate) {
         const tierConfig = tiers[usage.tier];
 
-        return res.status(402).json({
-          error: 'Generation limit reached',
-          code: 'LIMIT_REACHED',
+        // Return 429 Too Many Requests to prevent API key abuse
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          code: 'RATE_LIMITED',
           tier: usage.tier,
           tierName: tierConfig.name,
-          used: usage.used,
           limit: usage.limit,
+          used: usage.used,
+          remaining: 0,
+          resetAt: new Date(Date.now() + 60000).toISOString(),
           upgradeUrl,
           message: getUpgradeMessage(usage.tier)
         });

@@ -25,17 +25,27 @@ function generateId() {
 }
 
 /**
+ * Generate a secure view token for anonymous generations
+ */
+function generateViewToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+/**
  * Create a new pending generation record
- * @param {string} userId - The user's ID
+ * @param {string} userId - The user's ID (null for anonymous)
  * @param {string} trumpPhoto - The Trump photo path used
- * @returns {object} The created generation record
+ * @returns {object} The created generation record (includes viewToken for anonymous users)
  */
 function createGeneration(userId, trumpPhoto) {
   const id = generateId();
+  // Generate a viewToken for anonymous generations to prevent IDOR
+  const viewToken = userId ? null : generateViewToken();
   const generation = {
     id,
     userId,
     trumpPhoto,
+    viewToken, // Required to view anonymous generations
     status: STATUS.PENDING,
     resultUrl: null,
     errorCode: null,
@@ -123,6 +133,50 @@ function getGeneration(id) {
 }
 
 /**
+ * Validate access to a generation
+ * - Authenticated users can only access their own generations
+ * - Anonymous generations require the correct viewToken
+ * @param {string} id - The generation ID
+ * @param {string|null} userId - The requesting user's ID (null if anonymous)
+ * @param {string|null} viewToken - The view token provided in the request
+ * @returns {object} { authorized: boolean, generation: object|null, error: string|null }
+ */
+function validateGenerationAccess(id, userId, viewToken) {
+  const generation = generations.get(id);
+
+  if (!generation) {
+    return { authorized: false, generation: null, error: 'Generation not found' };
+  }
+
+  // Case 1: Generation belongs to an authenticated user
+  if (generation.userId) {
+    // Only the owner can view their generations
+    if (userId && userId === generation.userId) {
+      return { authorized: true, generation, error: null };
+    }
+    return { authorized: false, generation: null, error: 'Not authorized to view this generation' };
+  }
+
+  // Case 2: Anonymous generation - requires valid viewToken
+  if (!generation.userId) {
+    // viewToken is required for anonymous generations
+    if (!viewToken) {
+      return { authorized: false, generation: null, error: 'View token required for anonymous generations' };
+    }
+    // Validate the viewToken using timing-safe comparison
+    if (generation.viewToken && crypto.timingSafeEqual(
+      Buffer.from(viewToken),
+      Buffer.from(generation.viewToken)
+    )) {
+      return { authorized: true, generation, error: null };
+    }
+    return { authorized: false, generation: null, error: 'Invalid view token' };
+  }
+
+  return { authorized: false, generation: null, error: 'Access denied' };
+}
+
+/**
  * Clear all generations (useful for testing)
  */
 function clearAll() {
@@ -135,6 +189,7 @@ module.exports = {
   failGeneration,
   getGenerations,
   getGeneration,
+  validateGenerationAccess,
   clearAll,
   STATUS,
 };

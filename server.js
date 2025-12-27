@@ -7,6 +7,8 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
@@ -124,7 +126,7 @@ function parseGeminiError(error) {
 
   // Rate limiting
   if (errorMessage.includes('rate') || errorMessage.includes('quota') ||
-      errorMessage.includes('429') || errorString.includes('resource exhausted')) {
+    errorMessage.includes('429') || errorString.includes('resource exhausted')) {
     return {
       code: ERROR_CODES.RATE_LIMITED,
       message: 'Too many requests. Please wait a moment and try again.',
@@ -134,7 +136,7 @@ function parseGeminiError(error) {
 
   // Timeout
   if (errorMessage.includes('timeout') || errorMessage.includes('deadline') ||
-      errorMessage.includes('econnreset') || errorMessage.includes('socket hang up')) {
+    errorMessage.includes('econnreset') || errorMessage.includes('socket hang up')) {
     return {
       code: ERROR_CODES.TIMEOUT,
       message: 'Request timed out. The AI is busy - please try again.',
@@ -144,7 +146,7 @@ function parseGeminiError(error) {
 
   // Safety/content filters
   if (errorMessage.includes('safety') || errorMessage.includes('blocked') ||
-      errorMessage.includes('harmful') || errorMessage.includes('policy')) {
+    errorMessage.includes('harmful') || errorMessage.includes('policy')) {
     return {
       code: ERROR_CODES.SAFETY_BLOCK,
       message: 'Content blocked by safety filters. Please try a different photo.',
@@ -187,8 +189,8 @@ function analyzeResponseForFaceIssues(response) {
 
   // Check for no face detected
   if (fullText.includes('no face') || fullText.includes('cannot detect') ||
-      fullText.includes('unable to detect') || fullText.includes('no person') ||
-      fullText.includes("couldn't find") || fullText.includes('face not found')) {
+    fullText.includes('unable to detect') || fullText.includes('no person') ||
+    fullText.includes("couldn't find") || fullText.includes('face not found')) {
     return {
       hasFaceIssue: true,
       code: ERROR_CODES.NO_FACE,
@@ -199,7 +201,7 @@ function analyzeResponseForFaceIssues(response) {
 
   // Check for multiple faces
   if (fullText.includes('multiple faces') || fullText.includes('more than one face') ||
-      fullText.includes('several faces') || fullText.includes('multiple people')) {
+    fullText.includes('several faces') || fullText.includes('multiple people')) {
     return {
       hasFaceIssue: true,
       code: ERROR_CODES.MULTIPLE_FACES,
@@ -379,8 +381,99 @@ const rateLimitMiddleware = createRateLimitMiddleware({
   updateProfile
 });
 
+// ===== GLOBAL RATE LIMITING & ABUSE DETECTION =====
+
+// Global rate limiter for /api/generate - prevents API key abuse
+const globalGenerateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 100, // 100 total generations per hour across ALL users
+  message: { error: 'Service temporarily at capacity. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Suspicious IP tracking for abuse detection
+const suspiciousIPs = new Map(); // IP -> { count, firstSeen, lastSeen }
+
+/**
+ * Track suspicious activity and determine if IP should be blocked
+ * @param {string} ip - Client IP address
+ * @returns {boolean} True if IP should be blocked
+ */
+function trackSuspiciousActivity(ip) {
+  const now = Date.now();
+  const record = suspiciousIPs.get(ip) || { count: 0, firstSeen: now };
+  record.count++;
+  record.lastSeen = now;
+  suspiciousIPs.set(ip, record);
+
+  // Block if more than 10 requests in 5 minutes
+  const fiveMinutesAgo = now - (5 * 60 * 1000);
+  if (record.count > 10 && record.firstSeen > fiveMinutesAgo) {
+    const timespan = Math.round((now - record.firstSeen) / 1000);
+    console.log(`[ABUSE] IP ${ip} attempted ${record.count} generations in ${timespan}s - BLOCKED`);
+    return true; // Block this IP
+  }
+
+  // Clean up old entries (older than 1 hour)
+  const oneHourAgo = now - (60 * 60 * 1000);
+  for (const [trackedIP, data] of suspiciousIPs.entries()) {
+    if (data.lastSeen < oneHourAgo) {
+      suspiciousIPs.delete(trackedIP);
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Middleware to check for suspicious IP activity before processing generate requests
+ */
+function suspiciousActivityMiddleware(req, res, next) {
+  const clientIP = getClientIP(req);
+
+  if (trackSuspiciousActivity(clientIP)) {
+    return res.status(429).json({
+      error: 'Too many requests from your IP. Please try again later.',
+      code: ERROR_CODES.RATE_LIMITED
+    });
+  }
+
+  next();
+}
+
+// Rate limiter for admin login - prevent brute force attacks
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes
+  message: { error: 'Too many login attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for checkout creation - prevent abuse
+const checkoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 checkout attempts per 15 minutes
+  message: { error: 'Too many checkout attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware
 app.use(cors());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://api.stripe.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(express.json());
 app.use(express.static('public'));
 app.use('/output', express.static('output'));
@@ -396,17 +489,19 @@ app.use(checkAdminMiddleware);
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max
+    files: 1 // Only allow 1 file per request
+  },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      const error = new Error('Invalid file type. Please use JPG, PNG, or WebP images.');
+    if (!allowedTypes.includes(file.mimetype)) {
+      const error = new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.');
       error.code = ERROR_CODES.INVALID_FORMAT;
       error.details = `Received: ${file.mimetype}. Accepted: image/jpeg, image/png, image/webp`;
-      cb(error);
+      return cb(error);
     }
+    cb(null, true);
   }
 });
 
@@ -515,8 +610,12 @@ app.get('/api/photos', (req, res) => {
 });
 
 // API: Generate face swap
-// Apply upload, then rate limit middleware (which checks usage limits)
-app.post('/api/generate', upload.single('userPhoto'), handleMulterError, rateLimitMiddleware, async (req, res) => {
+// SECURITY: Multiple layers of rate limiting to prevent API key abuse:
+// 1. globalGenerateLimiter - 100 total generations/hour across ALL users (prevents API exhaustion)
+// 2. suspiciousActivityMiddleware - Blocks IPs with >10 requests in 5 minutes
+// 3. rateLimitMiddleware - Per-user rate limits based on tier
+// Order: global limit -> suspicious IP check -> per-user limit -> upload -> multer error handler -> handler
+app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, rateLimitMiddleware, upload.single('userPhoto'), handleMulterError, async (req, res) => {
   // Track generation for authenticated users
   let generationRecord = null;
   const userId = req.user?.id || null;
@@ -531,6 +630,19 @@ app.post('/api/generate', upload.single('userPhoto'), handleMulterError, rateLim
         ERROR_CODES.INVALID_FORMAT,
         'Your photo is required',
         'Please upload a photo of yourself.'
+      ));
+    }
+
+    // Validate file content using magic bytes (not just MIME type from header)
+    const fileType = await import('file-type');
+    const detectedType = await fileType.fileTypeFromBuffer(userPhoto.buffer);
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!detectedType || !allowedMimes.includes(detectedType.mime)) {
+      logError(ERROR_CODES.INVALID_FORMAT, 'File content validation failed');
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.INVALID_FORMAT,
+        'Invalid file content. Only JPEG, PNG, and WebP images are allowed.',
+        `Detected type: ${detectedType?.mime || 'unknown'}. The file may be corrupted or disguised.`
       ));
     }
 
@@ -778,8 +890,8 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
 
     // Return appropriate HTTP status based on error type
     const statusCode = parsedError.code === ERROR_CODES.RATE_LIMITED ? 429 :
-                       parsedError.code === ERROR_CODES.TIMEOUT ? 504 :
-                       parsedError.code === ERROR_CODES.SAFETY_BLOCK ? 400 : 500;
+      parsedError.code === ERROR_CODES.TIMEOUT ? 504 :
+        parsedError.code === ERROR_CODES.SAFETY_BLOCK ? 400 : 500;
 
     res.status(statusCode).json(createErrorResponse(
       parsedError.code,
@@ -796,7 +908,7 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
  * Creates a Stripe checkout session for $20/mo Pro subscription
  * Body: { userId: string, email: string }
  */
-app.post('/api/create-checkout', async (req, res) => {
+app.post('/api/create-checkout', checkoutLimiter, async (req, res) => {
   try {
     const { userId, email } = req.body;
 
@@ -1010,28 +1122,31 @@ app.get('/api/generations', requireAuth, async (req, res) => {
 /**
  * GET /api/generation/:id
  * Returns a specific generation by ID
+ * Query: ?viewToken=xxx (required for anonymous generations)
  */
 app.get('/api/generation/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const generation = generations.getGeneration(id);
+    const { viewToken } = req.query;
+    const userId = req.user?.id || null;
 
-    if (!generation) {
-      return res.status(404).json({
-        error: 'Generation not found'
+    // Use secure validation that handles both authenticated and anonymous generations
+    const { authorized, generation, error } = generations.validateGenerationAccess(id, userId, viewToken);
+
+    if (!authorized) {
+      const statusCode = error === 'Generation not found' ? 404 : 403;
+      return res.status(statusCode).json({
+        error: error
       });
     }
 
-    // Only allow owner to view their generations (if authenticated)
-    if (generation.userId && req.user?.id !== generation.userId) {
-      return res.status(403).json({
-        error: 'Not authorized to view this generation'
-      });
-    }
+    // Don't expose the viewToken in the response
+    const safeGeneration = { ...generation };
+    delete safeGeneration.viewToken;
 
     res.json({
       success: true,
-      generation
+      generation: safeGeneration
     });
   } catch (error) {
     console.error('Error in /api/generation/:id:', error.message);
@@ -1085,7 +1200,7 @@ app.get('/api/health', (req, res) => {
  * Authenticate with admin password to get session token
  * Body: { password: string }
  */
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
   const { password } = req.body;
 
   if (!password) {
