@@ -848,7 +848,7 @@
       margin-bottom: 8px;
     }
 
-    /* Debug toggle - hacker style */
+    /* Debug toggle - hacker style (admin only) */
     .debug-toggle {
       position: fixed;
       bottom: 20px;
@@ -862,6 +862,7 @@
       font-family: 'VT323', monospace;
       border: 2px solid #00ff00;
       text-transform: uppercase;
+      display: none; /* Hidden until admin logs in */
     }
 
     .debug-toggle:hover {
@@ -2360,11 +2361,13 @@
         adminOverlay.classList.remove('visible');
         usageBadge.textContent = 'ADMIN MODE [UNLIMITED]';
         usageBadge.classList.add('debug');
+        debugToggle.style.display = 'block'; // Show debug toggle for admins
         refreshDebugPanel();
       } else {
         adminBadge.classList.remove('visible');
         adminPanel.classList.remove('visible');
         adminPanelVisible = false;
+        debugToggle.style.display = 'none'; // Hide debug toggle
         updateUsageBadge();
       }
     }
