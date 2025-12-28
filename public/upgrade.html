@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade to Trump Swap Pro</title>
+  <title>Upgrade to Pimp My Epstein Pro</title>
   <style>
     * {
       box-sizing: border-box;
@@ -316,14 +316,14 @@
     <div class="success-message" id="successMessage">
       <div class="logo fade-in-up">&#127881;</div>
       <h2 class="fade-in-up delay-1">Welcome to Pro!</h2>
-      <p class="fade-in-up delay-2">Your subscription is now active. Enjoy unlimited Trump swaps without watermarks!</p>
+      <p class="fade-in-up delay-2">Your subscription is now active. Enjoy unlimited swaps without watermarks!</p>
       <a href="/" class="btn-upgrade fade-in-up delay-3">Start Swapping</a>
     </div>
 
     <!-- Main upgrade form -->
     <div id="upgradeForm">
       <div class="logo fade-in-up">&#127941;</div>
-      <h1 class="fade-in-up delay-1">Trump Swap Pro</h1>
+      <h1 class="fade-in-up delay-1">Pimp My Epstein Pro</h1>
       <p class="subtitle fade-in-up delay-2">Unlimited swaps, no watermarks</p>
 
       <div class="canceled-notice" id="canceledNotice">
@@ -389,7 +389,7 @@
         </div>
       </div>
 
-      <a href="/" class="back-link fade-in-up delay-4">&#8592; Back to Trump Swap</a>
+      <a href="/" class="back-link fade-in-up delay-4">&#8592; Back to Pimp My Epstein</a>
     </div>
   </div>
 
@@ -417,10 +417,10 @@
 
     // Generate or get user ID (simple anonymous ID for now)
     function getUserId() {
-      let userId = localStorage.getItem('trumpswap_user_id');
+      let userId = localStorage.getItem('epsteinswap_user_id');
       if (!userId) {
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('trumpswap_user_id', userId);
+        localStorage.setItem('epsteinswap_user_id', userId);
       }
       return userId;
     }
@@ -511,7 +511,7 @@
     });
 
     // Pre-fill email if stored
-    const storedEmail = localStorage.getItem('trumpswap_email');
+    const storedEmail = localStorage.getItem('epsteinswap_email');
     if (storedEmail) {
       emailInput.value = storedEmail;
     }
@@ -519,7 +519,7 @@
     // Save email on input
     emailInput.addEventListener('blur', () => {
       if (emailInput.value.trim()) {
-        localStorage.setItem('trumpswap_email', emailInput.value.trim());
+        localStorage.setItem('epsteinswap_email', emailInput.value.trim());
       }
     });
   </script>

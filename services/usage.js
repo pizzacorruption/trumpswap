@@ -1,5 +1,5 @@
 /**
- * Usage Tracking Service for Trump Swap
+ * Usage Tracking Service for Pimp My Epstein
  * Handles generation counting and tier checks
  */
 

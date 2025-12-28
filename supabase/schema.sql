@@ -1,4 +1,4 @@
--- Trump Swap Database Schema
+-- Pimp My Epstein Database Schema
 -- Run this in Supabase SQL Editor
 
 -- ============================================================================
@@ -25,7 +25,7 @@ CREATE INDEX idx_profiles_stripe_customer_id ON profiles(stripe_customer_id) WHE
 CREATE TABLE generations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
-  trump_photo TEXT NOT NULL,
+  epstein_photo TEXT NOT NULL,
   result_url TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'failed')),
   error_message TEXT,

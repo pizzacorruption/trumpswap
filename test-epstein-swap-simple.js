@@ -1,8 +1,8 @@
 /**
- * Simplified E2E Tests for Trump Swap
+ * Simplified E2E Tests for Pimp My Epstein
  * Bypasses gallery loading issues by directly testing API and using evaluate
  *
- * Run: node test-trump-swap-simple.js
+ * Run: node test-epstein-swap-simple.js
  */
 
 const { chromium } = require('playwright');
@@ -44,7 +44,7 @@ function logTest(testName, passed, error = null, duration = null) {
 async function runTests() {
   testResults.startTime = Date.now();
   console.log('\n========================================');
-  console.log('TRUMP SWAP E2E TESTS');
+  console.log('PIMP MY EPSTEIN E2E TESTS');
   console.log('========================================\n');
   console.log(`Started: ${new Date().toISOString()}`);
   console.log(`Test Image: ${TEST_IMAGE}\n`);
@@ -83,7 +83,7 @@ async function runTests() {
       if (health.status === 'ok' && health.apiKeySet) {
         logTest('Server health check', true);
         console.log(`       API Key: ${health.apiKeySet}`);
-        console.log(`       Photos: ${health.trumpPhotosCount}`);
+        console.log(`       Photos: ${health.epsteinPhotosCount}`);
       } else {
         logTest('Server health check', false, 'Server unhealthy');
       }
@@ -99,7 +99,7 @@ async function runTests() {
       const response = await page.goto(`${BASE_URL}/api/photos`, { waitUntil: 'networkidle' });
       const data = await response.json();
 
-      if (data.photos && data.photos.length >= 20) {
+      if (data.photos && data.photos.length >= 8) {
         logTest('Photos API returns photos', true);
         console.log(`       Found ${data.photos.length} photos`);
       } else {
@@ -121,7 +121,7 @@ async function runTests() {
       await page.screenshot({ path: path.join(TEST_OUTPUT_DIR, 'page-load.png') });
 
       const title = await page.title();
-      logTest('Page loads', title.includes('Trump'), `Title: ${title}`);
+      logTest('Page loads', title.includes('Epstein'), `Title: ${title}`);
     } catch (e) {
       logTest('Page loads', false, e);
     }
@@ -136,10 +136,10 @@ async function runTests() {
         try {
           const res = await fetch('/api/photos');
           const data = await res.json();
-          window.trumpPhotos = data.photos;
+          window.epsteinPhotos = data.photos;
 
           const gallery = document.getElementById('gallery');
-          gallery.innerHTML = window.trumpPhotos.map((photo, i) => `
+          gallery.innerHTML = window.epsteinPhotos.map((photo, i) => `
             <div class="gallery-item" data-index="${i}" data-path="${photo.path}">
               <img src="${photo.path}" alt="${photo.name}" loading="lazy">
               <div class="check">✓</div>
@@ -244,7 +244,7 @@ async function runTests() {
       const startTime = Date.now();
 
       // Make the API call directly
-      const result = await page.evaluate(async ({ trumpPhoto, imageBase64 }) => {
+      const result = await page.evaluate(async ({ epsteinPhoto, imageBase64 }) => {
         try {
           // Convert base64 to blob
           const byteCharacters = atob(imageBase64);
@@ -257,7 +257,7 @@ async function runTests() {
 
           const formData = new FormData();
           formData.append('userPhoto', blob, 'test-face.jpg');
-          formData.append('trumpPhoto', trumpPhoto);
+          formData.append('epsteinPhoto', epsteinPhoto);
           formData.append('debug', 'true');
 
           const response = await fetch('/api/generate', {
@@ -269,7 +269,7 @@ async function runTests() {
         } catch (e) {
           return { error: e.message };
         }
-      }, { trumpPhoto: selectedPath, imageBase64: base64Image });
+      }, { epsteinPhoto: selectedPath, imageBase64: base64Image });
 
       const genTime = Date.now() - startTime;
       testResults.generationTimes.push(genTime);
@@ -291,9 +291,9 @@ async function runTests() {
     }
 
     // ============================================================
-    // TEST 9: Multiple Different Trump Photos
+    // TEST 9: Multiple Different Epstein Photos
     // ============================================================
-    console.log('\n--- TEST 9: Different Trump Photos ---');
+    console.log('\n--- TEST 9: Different Epstein Photos ---');
     try {
       // Get photo list
       const photosResponse = await page.goto(`${BASE_URL}/api/photos`);
@@ -312,7 +312,7 @@ async function runTests() {
         console.log(`       Testing: ${photo.name}`);
 
         const startTime = Date.now();
-        const result = await page.evaluate(async ({ trumpPhoto, imageBase64 }) => {
+        const result = await page.evaluate(async ({ epsteinPhoto, imageBase64 }) => {
           const byteCharacters = atob(imageBase64);
           const byteNumbers = new Array(byteCharacters.length);
           for (let j = 0; j < byteCharacters.length; j++) {
@@ -323,7 +323,7 @@ async function runTests() {
 
           const formData = new FormData();
           formData.append('userPhoto', blob, 'test-face.jpg');
-          formData.append('trumpPhoto', trumpPhoto);
+          formData.append('epsteinPhoto', epsteinPhoto);
           formData.append('debug', 'true');
 
           const response = await fetch('/api/generate', {
@@ -331,7 +331,7 @@ async function runTests() {
             body: formData
           });
           return await response.json();
-        }, { trumpPhoto: photo.path, imageBase64: base64Image });
+        }, { epsteinPhoto: photo.path, imageBase64: base64Image });
 
         const genTime = Date.now() - startTime;
 
@@ -347,10 +347,10 @@ async function runTests() {
         await page.waitForTimeout(1000);
       }
 
-      logTest('Different Trump photos', successCount >= 2);
+      logTest('Different Epstein photos', successCount >= 2);
       console.log(`       Success: ${successCount}/${testPhotos.length}`);
     } catch (e) {
-      logTest('Different Trump photos', false, e);
+      logTest('Different Epstein photos', false, e);
     }
 
     // ============================================================
@@ -366,7 +366,7 @@ async function runTests() {
       const textContent = 'This is not an image';
       const base64Text = Buffer.from(textContent).toString('base64');
 
-      const result = await page.evaluate(async ({ trumpPhoto, textBase64 }) => {
+      const result = await page.evaluate(async ({ epsteinPhoto, textBase64 }) => {
         const byteCharacters = atob(textBase64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -377,14 +377,14 @@ async function runTests() {
 
         const formData = new FormData();
         formData.append('userPhoto', blob, 'test.txt');
-        formData.append('trumpPhoto', trumpPhoto);
+        formData.append('epsteinPhoto', epsteinPhoto);
 
         const response = await fetch('/api/generate', {
           method: 'POST',
           body: formData
         });
         return { status: response.status, data: await response.json() };
-      }, { trumpPhoto: firstPhoto.path, textBase64: base64Text });
+      }, { epsteinPhoto: firstPhoto.path, textBase64: base64Text });
 
       logTest('Invalid file type rejected', result.status === 400);
       console.log(`       Status: ${result.status}`);
@@ -394,9 +394,9 @@ async function runTests() {
     }
 
     // ============================================================
-    // TEST 11: Error - Missing Trump Photo
+    // TEST 11: Error - Missing Epstein Photo
     // ============================================================
-    console.log('\n--- TEST 11: Missing Trump Photo ---');
+    console.log('\n--- TEST 11: Missing Epstein Photo ---');
     try {
       const imageBuffer = fs.readFileSync(TEST_IMAGE);
       const base64Image = imageBuffer.toString('base64');
@@ -412,7 +412,7 @@ async function runTests() {
 
         const formData = new FormData();
         formData.append('userPhoto', blob, 'test-face.jpg');
-        // No trumpPhoto!
+        // No epsteinPhoto!
 
         const response = await fetch('/api/generate', {
           method: 'POST',
@@ -421,11 +421,11 @@ async function runTests() {
         return { status: response.status, data: await response.json() };
       }, { imageBase64: base64Image });
 
-      logTest('Missing trump photo rejected', result.status === 400);
+      logTest('Missing Epstein photo rejected', result.status === 400);
       console.log(`       Status: ${result.status}`);
       console.log(`       Error: ${result.data.error || 'none'}`);
     } catch (e) {
-      logTest('Missing trump photo rejected', false, e);
+      logTest('Missing Epstein photo rejected', false, e);
     }
 
     // ============================================================
@@ -435,7 +435,7 @@ async function runTests() {
     try {
       const result = await page.evaluate(async () => {
         const formData = new FormData();
-        formData.append('trumpPhoto', '/trump-photos/with-pence.jpg');
+        formData.append('epsteinPhoto', '/epstein-photos/clinton-1993-1.jpg');
         // No userPhoto!
 
         const response = await fetch('/api/generate', {

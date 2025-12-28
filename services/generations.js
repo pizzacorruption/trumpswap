@@ -34,17 +34,17 @@ function generateViewToken() {
 /**
  * Create a new pending generation record
  * @param {string} userId - The user's ID (null for anonymous)
- * @param {string} trumpPhoto - The Trump photo path used
+ * @param {string} epsteinPhoto - The Epstein photo path used
  * @returns {object} The created generation record (includes viewToken for anonymous users)
  */
-function createGeneration(userId, trumpPhoto) {
+function createGeneration(userId, epsteinPhoto) {
   const id = generateId();
   // Generate a viewToken for anonymous generations to prevent IDOR
   const viewToken = userId ? null : generateViewToken();
   const generation = {
     id,
     userId,
-    trumpPhoto,
+    epsteinPhoto,
     viewToken, // Required to view anonymous generations
     status: STATUS.PENDING,
     resultUrl: null,

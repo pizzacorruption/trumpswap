@@ -1,7 +1,7 @@
 {
   "name": "epswag",
   "version": "1.0.0",
-  "description": "AI Celebrity Selfie Generator - Nano Banana Pro wrapper",
+  "description": "Pimp My Epstein - parody media literacy face swap demo",
   "main": "poc.js",
   "scripts": {
     "poc": "node poc.js",

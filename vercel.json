@@ -20,8 +20,8 @@
       "dest": "/api/$1.js"
     },
     {
-      "src": "/trump-photos/(.*)",
-      "dest": "/public/trump-photos/$1"
+      "src": "/epstein-photos/(.*)",
+      "dest": "/public/epstein-photos/$1"
     },
     {
       "src": "/(.*)",

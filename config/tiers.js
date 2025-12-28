@@ -1,5 +1,5 @@
 /**
- * Tier Configuration for Trump Swap
+ * Tier Configuration for Pimp My Epstein
  * Defines usage limits for each subscription tier
  */
 

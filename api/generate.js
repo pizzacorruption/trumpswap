@@ -17,7 +17,7 @@ module.exports.config = config;
 /**
  * Add watermark to image buffer
  */
-async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
+async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
@@ -99,27 +99,27 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Only JPEG, PNG, and WebP images are allowed' });
     }
 
-    // Get trump photo selection
-    const trumpPhoto = fields.trumpPhoto?.[0] || fields.trumpPhoto;
-    if (!trumpPhoto) {
-      return res.status(400).json({ error: 'Trump photo selection is required' });
+    // Get Epstein photo selection
+    const epsteinPhoto = fields.epsteinPhoto?.[0] || fields.epsteinPhoto;
+    if (!epsteinPhoto) {
+      return res.status(400).json({ error: 'Epstein photo selection is required' });
     }
 
     // Read user photo buffer
     const userPhotoBuffer = fs.readFileSync(userPhotoFile.filepath);
     const userPhotoMime = userPhotoFile.mimetype;
 
-    // Read the Trump photo from public folder
+    // Read the Epstein photo from public folder
     // In Vercel, static files are available at process.cwd()
-    const trumpPhotoPath = path.join(process.cwd(), 'public', trumpPhoto);
-    if (!fs.existsSync(trumpPhotoPath)) {
-      return res.status(400).json({ error: 'Selected Trump photo not found' });
+    const epsteinPhotoPath = path.join(process.cwd(), 'public', epsteinPhoto);
+    if (!fs.existsSync(epsteinPhotoPath)) {
+      return res.status(400).json({ error: 'Selected Epstein photo not found' });
     }
 
-    const trumpPhotoBuffer = fs.readFileSync(trumpPhotoPath);
-    const trumpPhotoMime = trumpPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const epsteinPhotoBuffer = fs.readFileSync(epsteinPhotoPath);
+    const epsteinPhotoMime = epsteinPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    console.log(`Generating Trump swap... Trump photo: ${trumpPhoto}`);
+    console.log(`Generating Epstein swap... Epstein photo: ${epsteinPhoto}`);
 
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -133,28 +133,28 @@ module.exports = async function handler(req, res) {
     // Create the prompt
     const prompt = `PERSON REPLACEMENT TASK:
 
-IMAGE 1: Photo of Donald Trump with another person
-IMAGE 2: Photo of the person who should appear next to Trump instead
+IMAGE 1: Photo of Jeffrey Epstein with another person
+IMAGE 2: Photo of the person who should appear next to Jeffrey Epstein instead
 
-TASK: Replace the person standing with Trump (not Trump himself) with the person from IMAGE 2.
+TASK: Replace the person standing with Jeffrey Epstein (not Epstein himself) with the person from IMAGE 2.
 
 INSTRUCTIONS:
 - Remove the other person from IMAGE 1 entirely
-- Insert the person from IMAGE 2 in their place, standing next to Trump
+- Insert the person from IMAGE 2 in their place, standing next to Jeffrey Epstein
 - The person from IMAGE 2 should appear with their own body, clothes, and appearance
-- Keep Trump exactly as he is
+- Keep Jeffrey Epstein exactly as he is
 - Keep the same background and setting from IMAGE 1
-- Make it look like a natural photo of Trump standing with the person from IMAGE 2
+- Make it look like a natural photo of Jeffrey Epstein standing with the person from IMAGE 2
 - Match the lighting and scale so it looks realistic
 
-Generate the edited photo showing Trump with the new person.`;
+Generate the edited photo showing Jeffrey Epstein with the new person.`;
 
     // Make API request with both images
     const result = await model.generateContent([
       {
         inlineData: {
-          mimeType: trumpPhotoMime,
-          data: trumpPhotoBuffer.toString('base64'),
+          mimeType: epsteinPhotoMime,
+          data: epsteinPhotoBuffer.toString('base64'),
         },
       },
       {

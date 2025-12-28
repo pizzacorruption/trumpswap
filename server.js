@@ -1,6 +1,6 @@
 /**
- * Trump Swap Server
- * Face swap with pre-loaded Trump photos
+ * Pimp My Epstein Server
+ * Face swap with pre-loaded Epstein photos
  */
 
 require('dotenv').config();
@@ -285,7 +285,7 @@ function checkAdminMiddleware(req, res, next) {
  */
 function getAdminDebugInfo() {
   const anonymousStats = getAnonymousStats();
-  const photos = getTrumpPhotos();
+  const photos = getEpsteinPhotos();
 
   return {
     server: {
@@ -304,7 +304,7 @@ function getAdminDebugInfo() {
       minImageSize: MIN_IMAGE_SIZE
     },
     stats: {
-      trumpPhotosCount: photos.length,
+      epsteinPhotosCount: photos.length,
       anonymousUsersTracked: anonymousStats.totalTracked,
       activeAdminSessions: adminSessions.size
     },
@@ -477,7 +477,7 @@ app.use(helmet({
 app.use(express.json());
 app.use(express.static('public'));
 app.use('/output', express.static('output'));
-app.use('/trump-photos', express.static('public/trump-photos'));
+app.use('/epstein-photos', express.static('public/epstein-photos'));
 
 // Apply auth middleware globally (non-blocking, just attaches user info)
 app.use(authMiddleware);
@@ -535,7 +535,7 @@ function handleMulterError(err, req, res, next) {
 }
 
 // Ensure directories exist
-['output', 'public/trump-photos'].forEach(dir => {
+['output', 'public/epstein-photos'].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -544,7 +544,7 @@ function handleMulterError(err, req, res, next) {
 /**
  * Add watermark to image buffer - subtle horizontal style like SHOWFEETS
  */
-async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
+async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
@@ -583,10 +583,10 @@ async function addWatermark(inputBuffer, watermarkText = 'TRUMPSWAP.LOL') {
 }
 
 /**
- * Get list of Trump photos for gallery
+ * Get list of Epstein photos for gallery
  */
-function getTrumpPhotos() {
-  const photosDir = path.join(__dirname, 'public', 'trump-photos');
+function getEpsteinPhotos() {
+  const photosDir = path.join(__dirname, 'public', 'epstein-photos');
 
   if (!fs.existsSync(photosDir)) {
     return [];
@@ -596,16 +596,16 @@ function getTrumpPhotos() {
     .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
     .map(f => ({
       name: f.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
-      path: `/trump-photos/${f}`,
+      path: `/epstein-photos/${f}`,
       filename: f
     }));
 
   return files;
 }
 
-// API: Get Trump photos for gallery
+// API: Get Epstein photos for gallery
 app.get('/api/photos', (req, res) => {
-  const photos = getTrumpPhotos();
+  const photos = getEpsteinPhotos();
   res.json({ photos });
 });
 
@@ -623,7 +623,7 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
   try {
     const userPhoto = req.file;
-    const { trumpPhoto, debug } = req.body;
+    const { epsteinPhoto, debug } = req.body;
 
     if (!userPhoto) {
       return res.status(400).json(createErrorResponse(
@@ -646,11 +646,11 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       ));
     }
 
-    if (!trumpPhoto) {
+    if (!epsteinPhoto) {
       return res.status(400).json(createErrorResponse(
         ERROR_CODES.INVALID_FORMAT,
-        'Trump photo selection is required',
-        'Please select a Trump photo from the gallery.'
+        'Epstein photo selection is required',
+        'Please select an Epstein photo from the gallery.'
       ));
     }
 
@@ -667,26 +667,26 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
     // Create generation record for tracking (for authenticated users)
     if (userId) {
-      generationRecord = generations.createGeneration(userId, trumpPhoto);
+      generationRecord = generations.createGeneration(userId, epsteinPhoto);
       console.log(`   Generation ID: ${generationRecord.id}`);
     }
 
-    // Read the Trump photo from disk
-    const trumpPhotoPath = path.join(__dirname, 'public', trumpPhoto);
-    if (!fs.existsSync(trumpPhotoPath)) {
-      logError(ERROR_CODES.GENERATION_FAILED, `Trump photo not found: ${trumpPhoto}`);
+    // Read the Epstein photo from disk
+    const epsteinPhotoPath = path.join(__dirname, 'public', epsteinPhoto);
+    if (!fs.existsSync(epsteinPhotoPath)) {
+      logError(ERROR_CODES.GENERATION_FAILED, `Epstein photo not found: ${epsteinPhoto}`);
       return res.status(400).json(createErrorResponse(
         ERROR_CODES.GENERATION_FAILED,
-        'Selected Trump photo not found.',
+        'Selected Epstein photo not found.',
         'Please refresh the page and try again.'
       ));
     }
 
-    const trumpPhotoBuffer = fs.readFileSync(trumpPhotoPath);
-    const trumpPhotoMime = trumpPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const epsteinPhotoBuffer = fs.readFileSync(epsteinPhotoPath);
+    const epsteinPhotoMime = epsteinPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    console.log(`\n🎬 Generating Trump swap...`);
-    console.log(`   Trump photo: ${trumpPhoto}`);
+    console.log(`\n🎬 Generating Epstein swap...`);
+    console.log(`   Epstein photo: ${epsteinPhoto}`);
     console.log(`   User photo: ${userValidation.width}x${userValidation.height}px`);
 
     // Get the model - Nano Banana Pro (Gemini 3 Pro Image)
@@ -697,22 +697,22 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       },
     });
 
-    // Create the prompt - replace the WHOLE PERSON next to Trump, KEEP THEIR CLOTHES
+    // Create the prompt - replace the WHOLE PERSON next to Epstein, KEEP THEIR CLOTHES
     const prompt = `COMPOSITE PHOTO TASK
 
 Look at these two images:
-- IMAGE 1: Trump with someone else
+- IMAGE 1: Jeffrey Epstein with someone else
 - IMAGE 2: A person in casual clothes
 
-Create a NEW composite image where the person from IMAGE 2 is standing next to Trump instead of whoever was there before.
+Create a NEW composite image where the person from IMAGE 2 is standing next to Jeffrey Epstein instead of whoever was there before.
 
 ⚠️ MOST IMPORTANT RULE - CLOTHING:
 The person from IMAGE 2 must wear EXACTLY what they're wearing in their photo. If IMAGE 2 shows them in a t-shirt, jeans, hoodie, or any casual outfit - they MUST appear in that SAME outfit in the final image. Do NOT dress them in a suit. Do NOT make them look formal. Copy their exact outfit from IMAGE 2.
 
-This is meant to be FUNNY - someone in casual everyday clothes standing next to Trump in a formal setting. The humor comes from the contrast. Preserve their casual clothes!
+This is meant to be FUNNY - someone in casual everyday clothes standing next to Jeffrey Epstein in a formal setting. The humor comes from the contrast. Preserve their casual clothes!
 
 Other rules:
-- Trump stays exactly as he is
+- Jeffrey Epstein stays exactly as he is
 - Background from IMAGE 1 stays
 - Make lighting look natural
 - Person from IMAGE 2 keeps their face, hair, glasses, body type
@@ -734,8 +734,8 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
       const generatePromise = model.generateContent([
         {
           inlineData: {
-            mimeType: trumpPhotoMime,
-            data: trumpPhotoBuffer.toString('base64'),
+            mimeType: epsteinPhotoMime,
+            data: epsteinPhotoBuffer.toString('base64'),
           },
         },
         {
@@ -797,7 +797,7 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
           }
 
           // Save the image
-          const filename = `trump_${Date.now()}.png`;
+          const filename = `epstein_${Date.now()}.png`;
           const outputPath = path.join('output', filename);
           fs.writeFileSync(outputPath, imageBuffer);
 
@@ -830,7 +830,7 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
                 height: userValidation.height
               },
               watermarkApplied: !skipWatermark,
-              trumpPhoto: trumpPhoto,
+              epsteinPhoto: epsteinPhoto,
               timestamp: new Date().toISOString()
             };
           }
@@ -1180,7 +1180,7 @@ app.get('/api/config', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  const photos = getTrumpPhotos();
+  const photos = getEpsteinPhotos();
   const anonymousStats = getAnonymousStats();
 
   res.json({
@@ -1188,7 +1188,7 @@ app.get('/api/health', (req, res) => {
     apiKeySet: !!process.env.GEMINI_API_KEY,
     stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
     supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
-    trumpPhotosCount: photos.length,
+    epsteinPhotosCount: photos.length,
     anonymousUsersTracked: anonymousStats.totalTracked
   });
 });
@@ -1302,8 +1302,8 @@ app.get('/api/admin/status', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  const photos = getTrumpPhotos();
-  console.log(`\n🎺 Trump Swap Server`);
+  const photos = getEpsteinPhotos();
+  console.log(`\n🎺 Pimp My Epstein Server`);
   console.log(`   http://localhost:${PORT}`);
-  console.log(`   ${photos.length} Trump photos loaded\n`);
+  console.log(`   ${photos.length} Epstein photos loaded\n`);
 });

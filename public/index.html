@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PIMP MY TRUMP</title>
+  <title>PIMP MY EPSTEIN</title>
   <!-- Supabase JS Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- VCR OSD Mono font for VHS aesthetic -->
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     /* ========================================
-       PIMP MY TRUMP - MDE WORLD PEACE AESTHETIC
+       PIMP MY EPSTEIN - MDE WORLD PEACE AESTHETIC
        VHS / Glitch / Anti-Design / Raw
        ======================================== */
 
@@ -201,6 +201,20 @@
       border: 3px solid #fff;
       box-shadow: 4px 4px 0 #fff;
       transform: rotate(-1deg);
+    }
+
+    .parody-disclaimer {
+      display: inline-block;
+      margin-top: 16px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      font-family: 'VT323', monospace;
+      color: #00ffff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      border: 2px dashed #00ffff;
+      background: rgba(0, 255, 255, 0.08);
+      box-shadow: 3px 3px 0 #00ffff;
     }
 
     .usage-badge.debug {
@@ -1722,7 +1736,7 @@
   <!-- Full-page auth overlay - shown until user signs in -->
   <div class="auth-overlay" id="authOverlay">
     <div class="auth-card">
-      <h1>PIMP MY TRUMP</h1>
+      <h1>PIMP MY EPSTEIN</h1>
       <p class="subtitle">INJECT YOUR FACE INTO HISTORY</p>
       <div id="authOverlayContent">
         <p class="auth-loading-overlay">INITIALIZING SYSTEM...</p>
@@ -1770,17 +1784,18 @@
     </div>
 
     <header class="fade-in-up">
-      <h1>PIMP MY TRUMP</h1>
+      <h1>PIMP MY EPSTEIN</h1>
       <p class="subtitle">INJECT YOUR FACE INTO HISTORY</p>
       <div class="usage-badge" id="usageBadge">3 SWAPS REMAINING</div>
+      <div class="parody-disclaimer">PARODY SITE — MEDIA LITERACY DEMO. MANIPULATED IMAGES ARE USED TO SHOW HOW EASY FAKES CAN BE.</div>
     </header>
 
     <div id="mainContent">
       <div class="error" id="error"></div>
 
-      <!-- Step 1: Pick a Trump photo -->
+      <!-- Step 1: Pick an Epstein photo -->
       <div class="card fade-in-up delay-1">
-        <div class="card-title">1. SELECT YOUR TRUMP</div>
+        <div class="card-title">1. SELECT YOUR EPSTEIN SCENE</div>
         <div class="gallery" id="gallery">
           <!-- Photos loaded dynamically -->
         </div>
@@ -1829,7 +1844,7 @@
     <!-- Result -->
     <div class="card result" id="result">
       <div class="result-image-container">
-        <img id="resultImage" alt="Your pimped Trump">
+        <img id="resultImage" alt="Your pimped Epstein">
       </div>
       <div class="result-actions">
         <button class="btn-download" id="downloadBtn">
@@ -1985,8 +2000,8 @@
     // =====================================================
     let selectedPhoto = null;
     let userFile = null;
-    let usageCount = parseInt(localStorage.getItem('trumpswap_usage') || '0');
-    let debugMode = localStorage.getItem('trumpswap_debug') === 'true';
+    let usageCount = parseInt(localStorage.getItem('epsteinswap_usage') || '0');
+    let debugMode = localStorage.getItem('epsteinswap_debug') === 'true';
     let loadingInterval = null;
     const MAX_USAGE = 3;        // Free registered users: 3 generations
     const MAX_ANON_USAGE = 1;   // Anonymous users: 1 generation
@@ -1998,7 +2013,7 @@
     let serverUsageCount = 0;
 
     // Admin state
-    let adminToken = localStorage.getItem('trumpswap_admin_token') || null;
+    let adminToken = localStorage.getItem('epsteinswap_admin_token') || null;
     let adminPanelVisible = false;
     let lastGenerationDebugInfo = null;
 
@@ -2061,8 +2076,8 @@
     const adminLogoutBtn = document.getElementById('adminLogoutBtn');
     const refreshDebugBtn = document.getElementById('refreshDebugBtn');
 
-    // Trump photos (loaded from server)
-    let trumpPhotos = [];
+    // Epstein photos (loaded from server)
+    let epsteinPhotos = [];
 
     // =====================================================
     // AUTH FUNCTIONS
@@ -2344,7 +2359,7 @@
         }
 
         adminToken = data.token;
-        localStorage.setItem('trumpswap_admin_token', adminToken);
+        localStorage.setItem('epsteinswap_admin_token', adminToken);
         return true;
       } catch (err) {
         throw err;
@@ -2365,7 +2380,7 @@
       }
 
       adminToken = null;
-      localStorage.removeItem('trumpswap_admin_token');
+      localStorage.removeItem('epsteinswap_admin_token');
       updateAdminUI(false);
     }
 
@@ -2465,8 +2480,8 @@
       // Usage stats
       const usageHtml = `
         <div class="admin-stat-row">
-          <span class="admin-stat-label">Trump Photos</span>
-          <span class="admin-stat-value">${data.stats?.trumpPhotosCount || 0}</span>
+          <span class="admin-stat-label">Epstein Photos</span>
+          <span class="admin-stat-value">${data.stats?.epsteinPhotosCount || 0}</span>
         </div>
         <div class="admin-stat-row">
           <span class="admin-stat-label">Anonymous Users</span>
@@ -2582,7 +2597,7 @@
         const isValid = await checkAdminStatus();
         updateAdminUI(isValid);
         if (!isValid) {
-          localStorage.removeItem('trumpswap_admin_token');
+          localStorage.removeItem('epsteinswap_admin_token');
           adminToken = null;
         }
       }
@@ -2674,11 +2689,11 @@
       try {
         const res = await fetch('/api/photos');
         const data = await res.json();
-        trumpPhotos = data.photos;
+        epsteinPhotos = data.photos;
         renderGallery();
 
         // Auto-select random photo
-        if (trumpPhotos.length > 0) {
+        if (epsteinPhotos.length > 0) {
           selectRandomPhoto();
         }
       } catch (err) {
@@ -2687,7 +2702,7 @@
     }
 
     function renderGallery() {
-      gallery.innerHTML = trumpPhotos.map((photo, i) => `
+      gallery.innerHTML = epsteinPhotos.map((photo, i) => `
         <div class="gallery-item" data-index="${i}" data-path="${photo.path}">
           <img src="${photo.path}" alt="${photo.name}" loading="lazy">
           <div class="check">✓</div>
@@ -2840,7 +2855,7 @@
 
       const formData = new FormData();
       formData.append('userPhoto', userFile);
-      formData.append('trumpPhoto', selectedPhoto);
+      formData.append('epsteinPhoto', selectedPhoto);
       formData.append('debug', debugMode);
 
       try {
@@ -2887,7 +2902,7 @@
           } else {
             // Not logged in - use local storage
             usageCount++;
-            localStorage.setItem('trumpswap_usage', usageCount.toString());
+            localStorage.setItem('epsteinswap_usage', usageCount.toString());
             updateUsageBadge();
           }
         }
@@ -2910,7 +2925,7 @@
     downloadBtn.addEventListener('click', () => {
       const link = document.createElement('a');
       link.href = resultImage.src;
-      link.download = 'pimpmytrump-' + Date.now() + '.png';
+      link.download = 'pimpmyepstein-' + Date.now() + '.png';
       link.click();
     });
 
@@ -2924,11 +2939,11 @@
           // Try to share the image directly if supported
           const response = await fetch(imageUrl);
           const blob = await response.blob();
-          const file = new File([blob], 'pimpmytrump.png', { type: 'image/png' });
+          const file = new File([blob], 'pimpmyepstein.png', { type: 'image/png' });
 
           if (navigator.canShare({ files: [file] })) {
             await navigator.share({
-              title: 'PIMP MY TRUMP',
+              title: 'PIMP MY EPSTEIN',
               text: 'I INJECTED MY FACE INTO HISTORY',
               files: [file]
             });
@@ -2941,7 +2956,7 @@
         // Fall back to sharing URL
         try {
           await navigator.share({
-            title: 'PIMP MY TRUMP',
+            title: 'PIMP MY EPSTEIN',
             text: 'I INJECTED MY FACE INTO HISTORY',
             url: window.location.href
           });
@@ -3013,7 +3028,7 @@
       debugClicks++;
       if (debugClicks >= 3) {
         debugMode = !debugMode;
-        localStorage.setItem('trumpswap_debug', debugMode.toString());
+        localStorage.setItem('epsteinswap_debug', debugMode.toString());
         updateDebugToggle();
         updateUsageBadge();
         debugClicks = 0;

@@ -1,4 +1,4 @@
-# Trump Swap - Vercel Deployment Guide
+# Pimp My Epstein - Vercel Deployment Guide
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@
 ### Create Project
 - [ ] Go to [supabase.com/dashboard](https://supabase.com/dashboard)
 - [ ] Click "New Project"
-- [ ] Name it (e.g., `trump-swap`)
+- [ ] Name it (e.g., `pimp-my-epstein`)
 - [ ] Set a strong database password (save it)
 - [ ] Select region closest to users
 - [ ] Wait for project to provision (~2 min)
@@ -54,7 +54,7 @@
 ### Create Product
 - [ ] Go to [dashboard.stripe.com/products](https://dashboard.stripe.com/products)
 - [ ] Click "Add product"
-- [ ] Name: `Trump Swap Pro`
+- [ ] Name: `Pimp My Epstein Pro`
 - [ ] Pricing: **Recurring**, $20/month
 - [ ] Save product
 - [ ] Copy the **Price ID** (starts with `price_`) for `STRIPE_PRICE_ID`
@@ -119,7 +119,7 @@ Add all variables in Vercel project settings:
 ### Image Generation
 - [ ] Go to main app URL
 - [ ] Upload a face photo
-- [ ] Select a Trump photo
+- [ ] Select an Epstein photo
 - [ ] Generate (should work for free tier limit)
 
 ### Google Login

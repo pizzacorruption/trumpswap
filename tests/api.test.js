@@ -1,12 +1,12 @@
 /**
- * API Endpoint Tests for Trump Swap
+ * API Endpoint Tests for Pimp My Epstein
  *
  * Tests the REST API endpoints using native fetch.
  * Run with: node tests/api.test.js
  *
  * Prerequisites:
  * - Server must be running on localhost:3000
- * - At least one trump photo must exist in public/trump-photos
+ * - At least one Epstein photo must exist in public/epstein-photos
  */
 
 const assert = require('assert');
@@ -106,10 +106,10 @@ async function runAPITests() {
     assertType(data.supabaseConfigured, 'boolean', 'Expected supabaseConfigured to be boolean');
   });
 
-  await test('includes trumpPhotosCount number', async () => {
+  await test('includes epsteinPhotosCount number', async () => {
     const response = await fetch(`${BASE_URL}/api/health`);
     const data = await response.json();
-    assertType(data.trumpPhotosCount, 'number', 'Expected trumpPhotosCount to be number');
+    assertType(data.epsteinPhotosCount, 'number', 'Expected epsteinPhotosCount to be number');
   });
 
   await test('includes anonymousUsersTracked number', async () => {
@@ -152,7 +152,7 @@ async function runAPITests() {
 
     if (data.photos.length > 0) {
       const photo = data.photos[0];
-      assert.ok(photo.path.startsWith('/trump-photos/'), 'Photo path should start with /trump-photos/');
+      assert.ok(photo.path.startsWith('/epstein-photos/'), 'Photo path should start with /epstein-photos/');
     }
   });
 
@@ -249,7 +249,7 @@ async function runAPITests() {
 
   await test('generate endpoint requires userPhoto', async () => {
     const formData = new FormData();
-    formData.append('trumpPhoto', '/trump-photos/test.jpg');
+    formData.append('epsteinPhoto', '/epstein-photos/clinton-1993-1.jpg');
 
     const response = await fetch(`${BASE_URL}/api/generate`, {
       method: 'POST',
@@ -261,7 +261,7 @@ async function runAPITests() {
     assertExists(data.error, 'Expected error message');
   });
 
-  await test('generate endpoint requires trumpPhoto', async () => {
+  await test('generate endpoint requires epsteinPhoto', async () => {
     // Create a minimal valid image blob
     const dummyImageData = new Uint8Array([
       0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
@@ -394,7 +394,7 @@ async function runRateLimitTests() {
 
 async function main() {
   console.log('='.repeat(50));
-  console.log('Trump Swap API Tests');
+  console.log('Pimp My Epstein API Tests');
   console.log('='.repeat(50));
   console.log(`Testing against: ${BASE_URL}`);
   console.log('');

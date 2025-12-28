@@ -1,6 +1,6 @@
 /**
  * Stripe Payment Service
- * Handles subscriptions for Trump Swap Pro ($20/mo)
+ * Handles subscriptions for Pimp My Epstein Pro ($20/mo)
  */
 
 const Stripe = require('stripe');

@@ -1,8 +1,8 @@
 /**
- * Final E2E Tests for Trump Swap
+ * Final E2E Tests for Pimp My Epstein
  * Accounts for anonymous user rate limiting (1 generation)
  *
- * Run: node test-trump-swap-final.js
+ * Run: node test-epstein-swap-final.js
  */
 
 const { chromium } = require('playwright');
@@ -40,7 +40,7 @@ async function runTests() {
   testResults.startTime = Date.now();
 
   console.log('\n========================================');
-  console.log('TRUMP SWAP - FINAL E2E TEST SUITE');
+  console.log('PIMP MY EPSTEIN - FINAL E2E TEST SUITE');
   console.log('========================================\n');
   console.log(`Time: ${new Date().toISOString()}`);
   console.log(`Image: ${TEST_IMAGE}`);
@@ -64,15 +64,15 @@ async function runTests() {
       const resp = await page.goto(`${BASE_URL}/api/health`);
       const health = await resp.json();
       logTest('1. Server health check', health.status === 'ok' && health.apiKeySet);
-      console.log(`       Photos: ${health.trumpPhotosCount}, Anonymous tracked: ${health.anonymousUsersTracked}`);
+      console.log(`       Photos: ${health.epsteinPhotosCount}, Anonymous tracked: ${health.anonymousUsersTracked}`);
     } catch (e) { logTest('1. Server health check', false, e); }
 
     // Test 2: Photos API
     try {
       const resp = await page.goto(`${BASE_URL}/api/photos`);
       const data = await resp.json();
-      logTest('2. Photos API', data.photos?.length >= 20);
-      console.log(`       Found ${data.photos.length} Trump photos`);
+      logTest('2. Photos API', data.photos?.length >= 8);
+      console.log(`       Found ${data.photos.length} Epstein photos`);
     } catch (e) { logTest('2. Photos API', false, e); }
 
     // ========== UI TESTS ==========
@@ -83,7 +83,7 @@ async function runTests() {
       await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(1000);
       const title = await page.title();
-      logTest('3. Page loads', title.includes('Trump'));
+      logTest('3. Page loads', title.includes('Epstein'));
     } catch (e) { logTest('3. Page loads', false, e); }
 
     // Test 4: Manually load gallery (bypass auth issues)
@@ -91,9 +91,9 @@ async function runTests() {
       await page.evaluate(async () => {
         const res = await fetch('/api/photos');
         const data = await res.json();
-        window.trumpPhotos = data.photos;
+        window.epsteinPhotos = data.photos;
         const gallery = document.getElementById('gallery');
-        gallery.innerHTML = window.trumpPhotos.map((photo, i) =>
+        gallery.innerHTML = window.epsteinPhotos.map((photo, i) =>
           `<div class="gallery-item" data-index="${i}" data-path="${photo.path}">
             <img src="${photo.path}" alt="${photo.name}"><div class="check">✓</div>
           </div>`
@@ -103,7 +103,7 @@ async function runTests() {
       });
       await page.waitForTimeout(500);
       const count = await page.locator('.gallery-item').count();
-      logTest('4. Gallery renders', count >= 20);
+      logTest('4. Gallery renders', count >= 8);
       await page.screenshot({ path: path.join(TEST_OUTPUT_DIR, 'gallery.png') });
     } catch (e) { logTest('4. Gallery renders', false, e); }
 
@@ -139,7 +139,7 @@ async function runTests() {
         const blob = new Blob(['not an image'], { type: 'text/plain' });
         const formData = new FormData();
         formData.append('userPhoto', blob, 'test.txt');
-        formData.append('trumpPhoto', '/trump-photos/with-pence.jpg');
+        formData.append('epsteinPhoto', '/epstein-photos/clinton-1993-1.jpg');
         const r = await fetch('/api/generate', { method: 'POST', body: formData });
         return { status: r.status, data: await r.json() };
       });
@@ -151,7 +151,7 @@ async function runTests() {
     try {
       const result = await page.evaluate(async () => {
         const formData = new FormData();
-        formData.append('trumpPhoto', '/trump-photos/with-pence.jpg');
+        formData.append('epsteinPhoto', '/epstein-photos/clinton-1993-1.jpg');
         const r = await fetch('/api/generate', { method: 'POST', body: formData });
         return { status: r.status, data: await r.json() };
       });
@@ -159,7 +159,7 @@ async function runTests() {
       console.log(`       Response: ${result.data.error}`);
     } catch (e) { logTest('9. Missing photo rejected', false, e); }
 
-    // Test 10: Missing trump photo
+    // Test 10: Missing Epstein photo
     try {
       const result = await page.evaluate(async ({ b64 }) => {
         const bytes = atob(b64);
@@ -168,13 +168,13 @@ async function runTests() {
         const blob = new Blob([arr], { type: 'image/jpeg' });
         const formData = new FormData();
         formData.append('userPhoto', blob, 'face.jpg');
-        // No trumpPhoto!
+        // No epsteinPhoto!
         const r = await fetch('/api/generate', { method: 'POST', body: formData });
         return { status: r.status, data: await r.json() };
       }, { b64: base64Image });
-      logTest('10. Missing trump photo rejected', result.status === 400);
+      logTest('10. Missing Epstein photo rejected', result.status === 400);
       console.log(`       Response: ${result.data.error}`);
-    } catch (e) { logTest('10. Missing trump photo rejected', false, e); }
+    } catch (e) { logTest('10. Missing Epstein photo rejected', false, e); }
 
     // ========== GENERATION TEST ==========
     console.log('\n--- GENERATION TEST (1 allowed for anonymous) ---');
@@ -187,17 +187,17 @@ async function runTests() {
       console.log(`       Selected: ${selectedPath}`);
 
       const startTime = Date.now();
-      const result = await page.evaluate(async ({ trumpPhoto, b64 }) => {
+      const result = await page.evaluate(async ({ epsteinPhoto, b64 }) => {
         const bytes = atob(b64);
         const arr = new Uint8Array(bytes.length);
         for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
         const blob = new Blob([arr], { type: 'image/jpeg' });
         const formData = new FormData();
         formData.append('userPhoto', blob, 'test-face.jpg');
-        formData.append('trumpPhoto', trumpPhoto);
+        formData.append('epsteinPhoto', epsteinPhoto);
         const r = await fetch('/api/generate', { method: 'POST', body: formData });
         return { status: r.status, data: await r.json() };
-      }, { trumpPhoto: selectedPath, b64: base64Image });
+      }, { epsteinPhoto: selectedPath, b64: base64Image });
 
       const genTime = Date.now() - startTime;
       testResults.generationTimes.push(genTime);
@@ -221,7 +221,7 @@ async function runTests() {
         const blob = new Blob([arr], { type: 'image/jpeg' });
         const formData = new FormData();
         formData.append('userPhoto', blob, 'face.jpg');
-        formData.append('trumpPhoto', '/trump-photos/with-pence.jpg');
+        formData.append('epsteinPhoto', '/epstein-photos/clinton-1993-1.jpg');
         const r = await fetch('/api/generate', { method: 'POST', body: formData });
         return { status: r.status, data: await r.json() };
       }, { b64: base64Image });
@@ -267,7 +267,7 @@ async function runTests() {
         document.getElementById('mainContent').style.display = 'none';
         document.getElementById('result').classList.add('visible');
         if (imgUrl) document.getElementById('resultImage').src = imgUrl;
-      }, generatedImageUrl || '/trump-photos/with-pence.jpg');
+      }, generatedImageUrl || '/epstein-photos/clinton-1993-1.jpg');
 
       await page.click('#anotherBtn');
       await page.waitForTimeout(500);

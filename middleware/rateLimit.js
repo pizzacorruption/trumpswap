@@ -1,5 +1,5 @@
 /**
- * Rate Limiting Middleware for Trump Swap
+ * Rate Limiting Middleware for Pimp My Epstein
  * Enforces generation limits based on user tier
  */
 

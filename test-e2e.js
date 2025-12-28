@@ -1,5 +1,5 @@
 /**
- * E2E Test for Trump Swap
+ * E2E Test for Pimp My Epstein
  * Run: npx playwright test test-e2e.js --headed
  * Or: node test-e2e.js (for quick test)
  */
@@ -10,7 +10,7 @@ const path = require('path');
 const TEST_IMAGE = process.argv[2] || './test-face.jpg';
 
 async function runTest() {
-  console.log('🧪 Starting Trump Swap E2E Test');
+  console.log('🧪 Starting Pimp My Epstein E2E Test');
   console.log(`   Using test image: ${TEST_IMAGE}`);
 
   const browser = await chromium.launch({ headless: false });
@@ -25,7 +25,7 @@ async function runTest() {
 
     // 2. Check gallery has photos
     const photoCount = await page.locator('.gallery-item').count();
-    console.log(`   Found ${photoCount} Trump photos`);
+    console.log(`   Found ${photoCount} Epstein photos`);
 
     // 3. Select a random photo (or it auto-selects)
     const selectedPhoto = await page.locator('.gallery-item.selected').count();

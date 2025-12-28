@@ -2,10 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Get list of Trump photos for count
+ * Get list of Epstein photos for count
  */
-function getTrumpPhotos() {
-  const photosDir = path.join(process.cwd(), 'public', 'trump-photos');
+function getEpsteinPhotos() {
+  const photosDir = path.join(process.cwd(), 'public', 'epstein-photos');
 
   if (!fs.existsSync(photosDir)) {
     return [];
@@ -29,10 +29,10 @@ module.exports = function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const photos = getTrumpPhotos();
+  const photos = getEpsteinPhotos();
   res.json({
     status: 'ok',
     apiKeySet: !!process.env.GEMINI_API_KEY,
-    trumpPhotosCount: photos.length
+    epsteinPhotosCount: photos.length
   });
 };

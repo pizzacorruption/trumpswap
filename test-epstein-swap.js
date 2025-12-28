@@ -1,8 +1,8 @@
 /**
- * Comprehensive Playwright Tests for Trump Swap
+ * Comprehensive Playwright Tests for Pimp My Epstein
  * Tests all face swap functionality including error states and performance
  *
- * Run: node test-trump-swap.js
+ * Run: node test-epstein-swap.js
  */
 
 const { chromium } = require('playwright');
@@ -82,7 +82,7 @@ async function waitForNetworkIdle(page, timeout = 5000) {
 async function runTests() {
   testResults.startTime = Date.now();
   console.log('\n╔════════════════════════════════════════════════════════════╗');
-  console.log('║       TRUMP SWAP - COMPREHENSIVE E2E TEST SUITE           ║');
+  console.log('║       PIMP MY EPSTEIN - COMPREHENSIVE E2E TEST SUITE           ║');
   console.log('╚════════════════════════════════════════════════════════════╝\n');
   console.log(`Test started at: ${new Date().toISOString()}`);
   console.log(`Base URL: ${BASE_URL}`);
@@ -116,10 +116,10 @@ async function runTests() {
       const response = await page.goto(`${BASE_URL}/api/health`, { waitUntil: 'networkidle' });
       const health = await response.json();
 
-      if (health.status === 'ok' && health.apiKeySet && health.trumpPhotosCount > 0) {
+      if (health.status === 'ok' && health.apiKeySet && health.epsteinPhotosCount > 0) {
         logTest('Server health check', true);
         console.log(`   - API Key configured: ${health.apiKeySet}`);
-        console.log(`   - Trump photos loaded: ${health.trumpPhotosCount}`);
+        console.log(`   - Epstein photos loaded: ${health.epsteinPhotosCount}`);
       } else {
         logTest('Server health check', false, 'Server not healthy: ' + JSON.stringify(health));
       }
@@ -154,11 +154,11 @@ async function runTests() {
       await page.waitForSelector('.gallery-item', { timeout: 15000 });
       const photoCount = await page.locator('.gallery-item').count();
 
-      if (photoCount >= 20) {
+      if (photoCount >= 8) {
         logTest('Gallery loads with photos', true);
-        console.log(`   - Found ${photoCount} Trump photos`);
+        console.log(`   - Found ${photoCount} Epstein photos`);
       } else {
-        logTest('Gallery loads with photos', false, `Expected 20+ photos, found ${photoCount}`);
+        logTest('Gallery loads with photos', false, `Expected 8+ photos, found ${photoCount}`);
       }
     } catch (e) {
       logTest('Gallery loads with photos', false, e);
@@ -340,9 +340,9 @@ async function runTests() {
     }
 
     // ============================================================
-    // TEST 10: Test Different Trump Photos
+    // TEST 10: Test Different Epstein Photos
     // ============================================================
-    console.log('\n📋 TEST 10: Test Different Trump Photos');
+    console.log('\n📋 TEST 10: Test Different Epstein Photos');
     try {
       // Get all gallery items
       const galleryItems = page.locator('.gallery-item');
@@ -388,10 +388,10 @@ async function runTests() {
         }
       }
 
-      logTest('Different Trump photos work', successCount >= 2);
+      logTest('Different Epstein photos work', successCount >= 2);
       console.log(`   - Successful: ${successCount}/${testIndices.length}`);
     } catch (e) {
-      logTest('Different Trump photos work', false, e);
+      logTest('Different Epstein photos work', false, e);
     }
 
     // ============================================================

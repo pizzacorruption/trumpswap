@@ -1,5 +1,5 @@
 /**
- * Trump Swap UI/UX Playwright Test Suite
+ * Pimp My Epstein UI/UX Playwright Test Suite
  * Tests page load, photo selection, file upload, generate button, result display,
  * mobile responsiveness, and debug mode.
  */
@@ -46,7 +46,7 @@ async function takeScreenshot(page, name) {
 
 async function runTests() {
   console.log('\n========================================');
-  console.log('Trump Swap UI/UX Playwright Test Suite');
+  console.log('Pimp My Epstein UI/UX Playwright Test Suite');
   console.log('========================================\n');
 
   const browser = await chromium.launch({ headless: true });
@@ -122,13 +122,13 @@ async function runTests() {
     try {
       await page.waitForSelector('.gallery-item', { timeout: 5000 });
       const galleryItems = await page.locator('.gallery-item').count();
-      logTest('Gallery is populated with Trump photos', galleryItems > 0,
+      logTest('Gallery is populated with Epstein photos', galleryItems > 0,
         `${galleryItems} photos found`);
     } catch (e) {
       // Gallery items didn't load - let's check if the gallery HTML is there
       const galleryHTML = await page.locator('#gallery').innerHTML();
       console.log(`   Gallery HTML content (first 200 chars): ${galleryHTML.substring(0, 200)}`);
-      logTest('Gallery is populated with Trump photos', false,
+      logTest('Gallery is populated with Epstein photos', false,
         'No gallery items found - likely JS error preventing initialization');
     }
 
@@ -151,7 +151,7 @@ async function runTests() {
       logTest('A photo is auto-selected on page load', autoSelected === 1,
         autoSelected === 1 ? 'One photo auto-selected' : `${autoSelected} selected`);
 
-      // Test 2.2: Click on different Trump photos
+      // Test 2.2: Click on different Epstein photos
       const secondPhoto = page.locator('.gallery-item').nth(1);
       await secondPhoto.click();
       await page.waitForTimeout(300);
@@ -186,9 +186,9 @@ async function runTests() {
     // ============================================
     console.log('\n--- 3. File Upload ---\n');
 
-    // Use a Trump photo as test input
-    const trumpPhotos = fs.readdirSync(path.join(__dirname, 'public', 'trump-photos'));
-    let uploadFile = path.join(__dirname, 'public', 'trump-photos', trumpPhotos[0]);
+    // Use a Epstein photo as test input
+    const epsteinPhotos = fs.readdirSync(path.join(__dirname, 'public', 'epstein-photos'));
+    let uploadFile = path.join(__dirname, 'public', 'epstein-photos', epsteinPhotos[0]);
     console.log(`   Using test file: ${uploadFile}`);
 
     // Test 3.1: File input works

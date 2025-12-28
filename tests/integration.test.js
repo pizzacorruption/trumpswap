@@ -1,5 +1,5 @@
 /**
- * Integration Tests for Trump Swap
+ * Integration Tests for Pimp My Epstein
  *
  * Tests the full flow from upload to result with mocked Gemini API.
  * Also tests auth middleware and rate limiting behavior.
@@ -396,7 +396,7 @@ async function runFullFlowTests() {
     generations.clearAll();
 
     // 1. Create generation
-    const gen = generations.createGeneration('flow-user-1', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('flow-user-1', '/epstein-photos/test.jpg');
     assertEqual(gen.status, 'pending', 'Should start as pending');
 
     // 2. Simulate successful API response
@@ -414,7 +414,7 @@ async function runFullFlowTests() {
     generations.clearAll();
 
     // 1. Create generation
-    const gen = generations.createGeneration('flow-user-2', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('flow-user-2', '/epstein-photos/test.jpg');
 
     // 2. Simulate API failure
     const failed = generations.failGeneration(gen.id, 'SAFETY_BLOCK', 'Content blocked');
@@ -450,9 +450,9 @@ async function runFullFlowTests() {
     generations.clearAll();
 
     const userId = 'history-user';
-    generations.createGeneration(userId, '/trump-photos/1.jpg');
-    generations.createGeneration(userId, '/trump-photos/2.jpg');
-    generations.createGeneration(userId, '/trump-photos/3.jpg');
+    generations.createGeneration(userId, '/epstein-photos/1.jpg');
+    generations.createGeneration(userId, '/epstein-photos/2.jpg');
+    generations.createGeneration(userId, '/epstein-photos/3.jpg');
 
     const history = generations.getGenerations(userId);
     assertEqual(history.length, 3, 'Should have 3 generations');
@@ -461,9 +461,9 @@ async function runFullFlowTests() {
   await test('separates generations by user', async () => {
     generations.clearAll();
 
-    generations.createGeneration('user-A', '/trump-photos/a.jpg');
-    generations.createGeneration('user-B', '/trump-photos/b.jpg');
-    generations.createGeneration('user-A', '/trump-photos/a2.jpg');
+    generations.createGeneration('user-A', '/epstein-photos/a.jpg');
+    generations.createGeneration('user-B', '/epstein-photos/b.jpg');
+    generations.createGeneration('user-A', '/epstein-photos/a2.jpg');
 
     const historyA = generations.getGenerations('user-A');
     const historyB = generations.getGenerations('user-B');
@@ -532,7 +532,7 @@ async function runErrorHandlingTests() {
   await test('NO_FACE error is stored and retrievable', async () => {
     generations.clearAll();
 
-    const gen = generations.createGeneration('error-test-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-test-user', '/epstein-photos/test.jpg');
     generations.failGeneration(gen.id, 'NO_FACE', 'No face detected in the photo');
 
     const retrieved = generations.getGeneration(gen.id);
@@ -542,7 +542,7 @@ async function runErrorHandlingTests() {
   });
 
   await test('TIMEOUT error is stored correctly', async () => {
-    const gen = generations.createGeneration('timeout-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('timeout-user', '/epstein-photos/test.jpg');
     generations.failGeneration(gen.id, 'TIMEOUT', 'Request took too long');
 
     const retrieved = generations.getGeneration(gen.id);
@@ -555,15 +555,15 @@ async function runErrorHandlingTests() {
     const userId = 'mixed-history-user';
 
     // Successful generation
-    const success = generations.createGeneration(userId, '/trump-photos/1.jpg');
+    const success = generations.createGeneration(userId, '/epstein-photos/1.jpg');
     generations.completeGeneration(success.id, '/output/success.png');
 
     // Failed generation
-    const failed = generations.createGeneration(userId, '/trump-photos/2.jpg');
+    const failed = generations.createGeneration(userId, '/epstein-photos/2.jpg');
     generations.failGeneration(failed.id, 'SAFETY_BLOCK', 'Blocked');
 
     // Pending generation
-    generations.createGeneration(userId, '/trump-photos/3.jpg');
+    generations.createGeneration(userId, '/epstein-photos/3.jpg');
 
     const history = generations.getGenerations(userId);
     assertEqual(history.length, 3, 'Should have all 3 generations');
@@ -582,9 +582,9 @@ async function runErrorHandlingTests() {
     const userId = 'concurrent-user';
 
     // Create multiple at once
-    const gen1 = generations.createGeneration(userId, '/trump-photos/1.jpg');
-    const gen2 = generations.createGeneration(userId, '/trump-photos/2.jpg');
-    const gen3 = generations.createGeneration(userId, '/trump-photos/3.jpg');
+    const gen1 = generations.createGeneration(userId, '/epstein-photos/1.jpg');
+    const gen2 = generations.createGeneration(userId, '/epstein-photos/2.jpg');
+    const gen3 = generations.createGeneration(userId, '/epstein-photos/3.jpg');
 
     // All should be pending
     assertEqual(generations.getGeneration(gen1.id).status, 'pending');
@@ -627,24 +627,24 @@ async function runEdgeCaseTests() {
     assertEqual(usageInfo.remaining, 1, 'Should have 1 remaining');
   });
 
-  await test('generation with very long trumpPhoto path', async () => {
+  await test('generation with very long epsteinPhoto path', async () => {
     generations.clearAll();
 
-    const longPath = '/trump-photos/' + 'a'.repeat(500) + '.jpg';
+    const longPath = '/epstein-photos/' + 'a'.repeat(500) + '.jpg';
     const gen = generations.createGeneration('long-path-user', longPath);
 
-    assertEqual(gen.trumpPhoto, longPath, 'Should store long path');
+    assertEqual(gen.epsteinPhoto, longPath, 'Should store long path');
     const retrieved = generations.getGeneration(gen.id);
-    assertEqual(retrieved.trumpPhoto, longPath, 'Should retrieve long path');
+    assertEqual(retrieved.epsteinPhoto, longPath, 'Should retrieve long path');
   });
 
   await test('generation with special characters in path', async () => {
     generations.clearAll();
 
-    const specialPath = '/trump-photos/test-photo_2024 (1).jpg';
+    const specialPath = '/epstein-photos/test-photo_2024 (1).jpg';
     const gen = generations.createGeneration('special-path-user', specialPath);
 
-    assertEqual(gen.trumpPhoto, specialPath, 'Should store special characters');
+    assertEqual(gen.epsteinPhoto, specialPath, 'Should store special characters');
   });
 
   await test('handles rapid sequential generations', async () => {
@@ -655,7 +655,7 @@ async function runEdgeCaseTests() {
 
     // Create 100 rapid generations
     for (let i = 0; i < 100; i++) {
-      const gen = generations.createGeneration(userId, `/trump-photos/${i}.jpg`);
+      const gen = generations.createGeneration(userId, `/epstein-photos/${i}.jpg`);
       ids.push(gen.id);
     }
 
@@ -673,8 +673,8 @@ async function runEdgeCaseTests() {
   await test('getGenerations with limit larger than available', async () => {
     generations.clearAll();
 
-    generations.createGeneration('limit-user', '/trump-photos/1.jpg');
-    generations.createGeneration('limit-user', '/trump-photos/2.jpg');
+    generations.createGeneration('limit-user', '/epstein-photos/1.jpg');
+    generations.createGeneration('limit-user', '/epstein-photos/2.jpg');
 
     const result = generations.getGenerations('limit-user', 100);
     assertEqual(result.length, 2, 'Should return all available (2)');
@@ -683,7 +683,7 @@ async function runEdgeCaseTests() {
   await test('getGenerations with limit of 0', async () => {
     generations.clearAll();
 
-    generations.createGeneration('zero-limit-user', '/trump-photos/1.jpg');
+    generations.createGeneration('zero-limit-user', '/epstein-photos/1.jpg');
 
     const result = generations.getGenerations('zero-limit-user', 0);
     assertEqual(result.length, 0, 'Should return empty array with limit 0');
@@ -720,7 +720,7 @@ async function runEdgeCaseTests() {
 
 async function main() {
   console.log('='.repeat(50));
-  console.log('Trump Swap Integration Tests');
+  console.log('Pimp My Epstein Integration Tests');
   console.log('='.repeat(50));
   console.log('');
 

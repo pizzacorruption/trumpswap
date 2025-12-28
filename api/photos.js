@@ -2,11 +2,11 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Get list of Trump photos for gallery
+ * Get list of Epstein photos for gallery
  */
-function getTrumpPhotos() {
+function getEpsteinPhotos() {
   // In Vercel, static files are at process.cwd()/public
-  const photosDir = path.join(process.cwd(), 'public', 'trump-photos');
+  const photosDir = path.join(process.cwd(), 'public', 'epstein-photos');
 
   if (!fs.existsSync(photosDir)) {
     return [];
@@ -16,7 +16,7 @@ function getTrumpPhotos() {
     .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
     .map(f => ({
       name: f.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
-      path: `/trump-photos/${f}`,
+      path: `/epstein-photos/${f}`,
       filename: f
     }));
 
@@ -37,6 +37,6 @@ module.exports = function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const photos = getTrumpPhotos();
+  const photos = getEpsteinPhotos();
   res.json({ photos });
 };

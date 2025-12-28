@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate "PIMP MY TRUMP" logo using Gemini API
+ * Generate "PIMP MY EPSTEIN" logo using Gemini API
  * Style: Million Dollar Extreme / World Peace aesthetic
  * VHS glitch, bold typography, ironic/satirical, raw look
  */
@@ -27,7 +27,7 @@ async function generateLogo() {
     model: 'imagen-3.0-generate-001'
   });
 
-  const prompt = `Create a logo with the text "PIMP MY TRUMP" in the style of Million Dollar Extreme World Peace Adult Swim aesthetic:
+  const prompt = `Create a logo with the text "PIMP MY EPSTEIN" in the style of Million Dollar Extreme World Peace Adult Swim aesthetic:
 
 - VHS glitch effects, scan lines, distortion artifacts
 - Bold, aggressive typography - chunky block letters
@@ -89,7 +89,7 @@ async function tryFlashModel(genAI) {
     }
   });
 
-  const prompt = `Generate an image: A logo with the text "PIMP MY TRUMP" in Million Dollar Extreme World Peace Adult Swim aesthetic. VHS glitch effects, scan lines, bold aggressive block letter typography, black and white with neon pink and electric blue glitch accents. TV static texture, CRT monitor look, grainy lo-fi but intentional. Horizontal banner format for website header.`;
+  const prompt = `Generate an image: A logo with the text "PIMP MY EPSTEIN" in Million Dollar Extreme World Peace Adult Swim aesthetic. VHS glitch effects, scan lines, bold aggressive block letter typography, black and white with neon pink and electric blue glitch accents. TV static texture, CRT monitor look, grainy lo-fi but intentional. Horizontal banner format for website header.`;
 
   try {
     const result = await model.generateContent(prompt);

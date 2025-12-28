@@ -1,5 +1,5 @@
 /**
- * Unit Tests for Trump Swap Services
+ * Unit Tests for Pimp My Epstein Services
  *
  * Tests the generations.js and usage.js services in isolation.
  * Run with: node tests/unit.test.js
@@ -97,41 +97,41 @@ function runGenerationsTests() {
   console.log('createGeneration:');
 
   test('creates generation with unique id', () => {
-    const gen = generations.createGeneration('user-123', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-123', '/epstein-photos/test.jpg');
     assertExists(gen.id, 'Should have id');
     assertType(gen.id, 'string', 'ID should be string');
     assertEqual(gen.id.length, 32, 'ID should be 32 characters (16 bytes hex)');
   });
 
   test('creates generation with correct userId', () => {
-    const gen = generations.createGeneration('user-456', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-456', '/epstein-photos/test.jpg');
     assertEqual(gen.userId, 'user-456', 'Should have correct userId');
   });
 
-  test('creates generation with correct trumpPhoto', () => {
-    const gen = generations.createGeneration('user-789', '/trump-photos/photo1.jpg');
-    assertEqual(gen.trumpPhoto, '/trump-photos/photo1.jpg', 'Should have correct trumpPhoto');
+  test('creates generation with correct epsteinPhoto', () => {
+    const gen = generations.createGeneration('user-789', '/epstein-photos/photo1.jpg');
+    assertEqual(gen.epsteinPhoto, '/epstein-photos/photo1.jpg', 'Should have correct epsteinPhoto');
   });
 
   test('creates generation with pending status', () => {
-    const gen = generations.createGeneration('user-test', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-test', '/epstein-photos/test.jpg');
     assertEqual(gen.status, generations.STATUS.PENDING, 'Should have pending status');
   });
 
   test('creates generation with null resultUrl', () => {
-    const gen = generations.createGeneration('user-test', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-test', '/epstein-photos/test.jpg');
     assertNull(gen.resultUrl, 'resultUrl should be null');
   });
 
   test('creates generation with null error fields', () => {
-    const gen = generations.createGeneration('user-test', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-test', '/epstein-photos/test.jpg');
     assertNull(gen.errorCode, 'errorCode should be null');
     assertNull(gen.errorMessage, 'errorMessage should be null');
   });
 
   test('creates generation with createdAt timestamp', () => {
     const before = new Date().toISOString();
-    const gen = generations.createGeneration('user-test', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-test', '/epstein-photos/test.jpg');
     const after = new Date().toISOString();
 
     assertExists(gen.createdAt, 'Should have createdAt');
@@ -140,13 +140,13 @@ function runGenerationsTests() {
   });
 
   test('creates generation with null completedAt', () => {
-    const gen = generations.createGeneration('user-test', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-test', '/epstein-photos/test.jpg');
     assertNull(gen.completedAt, 'completedAt should be null');
   });
 
   test('generates unique IDs for each generation', () => {
-    const gen1 = generations.createGeneration('user-1', '/trump-photos/test.jpg');
-    const gen2 = generations.createGeneration('user-2', '/trump-photos/test.jpg');
+    const gen1 = generations.createGeneration('user-1', '/epstein-photos/test.jpg');
+    const gen2 = generations.createGeneration('user-2', '/epstein-photos/test.jpg');
     assertNotEqual(gen1.id, gen2.id, 'IDs should be unique');
   });
 
@@ -156,19 +156,19 @@ function runGenerationsTests() {
   console.log('\ncompleteGeneration:');
 
   test('updates status to completed', () => {
-    const gen = generations.createGeneration('user-complete', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-complete', '/epstein-photos/test.jpg');
     const updated = generations.completeGeneration(gen.id, '/output/result.png');
     assertEqual(updated.status, generations.STATUS.COMPLETED, 'Should have completed status');
   });
 
   test('sets resultUrl correctly', () => {
-    const gen = generations.createGeneration('user-complete', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-complete', '/epstein-photos/test.jpg');
     const updated = generations.completeGeneration(gen.id, '/output/result123.png');
     assertEqual(updated.resultUrl, '/output/result123.png', 'Should have correct resultUrl');
   });
 
   test('sets completedAt timestamp', () => {
-    const gen = generations.createGeneration('user-complete', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-complete', '/epstein-photos/test.jpg');
     const updated = generations.completeGeneration(gen.id, '/output/result.png');
     assertExists(updated.completedAt, 'Should have completedAt');
   });
@@ -184,25 +184,25 @@ function runGenerationsTests() {
   console.log('\nfailGeneration:');
 
   test('updates status to failed', () => {
-    const gen = generations.createGeneration('user-fail', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-fail', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'SAFETY_BLOCK', 'Content blocked');
     assertEqual(updated.status, generations.STATUS.FAILED, 'Should have failed status');
   });
 
   test('sets errorCode correctly', () => {
-    const gen = generations.createGeneration('user-fail', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-fail', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'NO_FACE', 'No face detected');
     assertEqual(updated.errorCode, 'NO_FACE', 'Should have correct errorCode');
   });
 
   test('sets errorMessage correctly', () => {
-    const gen = generations.createGeneration('user-fail', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-fail', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'TIMEOUT', 'Request timed out');
     assertEqual(updated.errorMessage, 'Request timed out', 'Should have correct errorMessage');
   });
 
   test('sets completedAt timestamp on failure', () => {
-    const gen = generations.createGeneration('user-fail', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-fail', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'ERROR', 'Something went wrong');
     assertExists(updated.completedAt, 'Should have completedAt');
   });
@@ -218,7 +218,7 @@ function runGenerationsTests() {
   console.log('\ngetGeneration:');
 
   test('retrieves generation by id', () => {
-    const gen = generations.createGeneration('user-get', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('user-get', '/epstein-photos/test.jpg');
     const retrieved = generations.getGeneration(gen.id);
     assertEqual(retrieved.id, gen.id, 'Should retrieve correct generation');
   });
@@ -241,17 +241,17 @@ function runGenerationsTests() {
 
   test('returns generations for user', () => {
     // Create a few generations for a specific user
-    generations.createGeneration('user-history-1', '/trump-photos/a.jpg');
-    generations.createGeneration('user-history-1', '/trump-photos/b.jpg');
-    generations.createGeneration('user-history-1', '/trump-photos/c.jpg');
+    generations.createGeneration('user-history-1', '/epstein-photos/a.jpg');
+    generations.createGeneration('user-history-1', '/epstein-photos/b.jpg');
+    generations.createGeneration('user-history-1', '/epstein-photos/c.jpg');
 
     const result = generations.getGenerations('user-history-1');
     assertEqual(result.length, 3, 'Should return 3 generations');
   });
 
   test('only returns generations for specified user', () => {
-    generations.createGeneration('user-A', '/trump-photos/a.jpg');
-    generations.createGeneration('user-B', '/trump-photos/b.jpg');
+    generations.createGeneration('user-A', '/epstein-photos/a.jpg');
+    generations.createGeneration('user-B', '/epstein-photos/b.jpg');
 
     const resultA = generations.getGenerations('user-A');
     const resultB = generations.getGenerations('user-B');
@@ -268,7 +268,7 @@ function runGenerationsTests() {
   test('respects limit parameter', () => {
     // Create multiple generations
     for (let i = 0; i < 5; i++) {
-      generations.createGeneration('user-limit-test', `/trump-photos/${i}.jpg`);
+      generations.createGeneration('user-limit-test', `/epstein-photos/${i}.jpg`);
     }
 
     const result = generations.getGenerations('user-limit-test', 2);
@@ -279,8 +279,8 @@ function runGenerationsTests() {
     generations.clearAll();
 
     // Create generations - they may have same timestamp if created quickly
-    const gen1 = generations.createGeneration('user-order', '/trump-photos/first.jpg');
-    const gen2 = generations.createGeneration('user-order', '/trump-photos/second.jpg');
+    const gen1 = generations.createGeneration('user-order', '/epstein-photos/first.jpg');
+    const gen2 = generations.createGeneration('user-order', '/epstein-photos/second.jpg');
 
     const result = generations.getGenerations('user-order');
 
@@ -317,8 +317,8 @@ function runGenerationsTests() {
   console.log('\nclearAll:');
 
   test('clears all generations', () => {
-    generations.createGeneration('user-clear', '/trump-photos/test.jpg');
-    generations.createGeneration('user-clear', '/trump-photos/test2.jpg');
+    generations.createGeneration('user-clear', '/epstein-photos/test.jpg');
+    generations.createGeneration('user-clear', '/epstein-photos/test2.jpg');
 
     generations.clearAll();
 
@@ -585,55 +585,55 @@ function runErrorCodeTests() {
 
   test('generation can fail with NO_FACE code', () => {
     generations.clearAll();
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'NO_FACE', 'No face detected');
     assertEqual(updated.errorCode, 'NO_FACE', 'Should store NO_FACE code');
   });
 
   test('generation can fail with MULTIPLE_FACES code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'MULTIPLE_FACES', 'Multiple faces detected');
     assertEqual(updated.errorCode, 'MULTIPLE_FACES', 'Should store MULTIPLE_FACES code');
   });
 
   test('generation can fail with IMAGE_TOO_SMALL code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'IMAGE_TOO_SMALL', 'Image too small');
     assertEqual(updated.errorCode, 'IMAGE_TOO_SMALL', 'Should store IMAGE_TOO_SMALL code');
   });
 
   test('generation can fail with SAFETY_BLOCK code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'SAFETY_BLOCK', 'Content blocked');
     assertEqual(updated.errorCode, 'SAFETY_BLOCK', 'Should store SAFETY_BLOCK code');
   });
 
   test('generation can fail with RATE_LIMITED code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'RATE_LIMITED', 'Too many requests');
     assertEqual(updated.errorCode, 'RATE_LIMITED', 'Should store RATE_LIMITED code');
   });
 
   test('generation can fail with TIMEOUT code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'TIMEOUT', 'Request timed out');
     assertEqual(updated.errorCode, 'TIMEOUT', 'Should store TIMEOUT code');
   });
 
   test('generation can fail with INVALID_FORMAT code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'INVALID_FORMAT', 'Invalid file format');
     assertEqual(updated.errorCode, 'INVALID_FORMAT', 'Should store INVALID_FORMAT code');
   });
 
   test('generation can fail with GENERATION_FAILED code', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const updated = generations.failGeneration(gen.id, 'GENERATION_FAILED', 'Generation failed');
     assertEqual(updated.errorCode, 'GENERATION_FAILED', 'Should store GENERATION_FAILED code');
   });
 
   test('failed generation preserves error message', () => {
-    const gen = generations.createGeneration('error-user', '/trump-photos/test.jpg');
+    const gen = generations.createGeneration('error-user', '/epstein-photos/test.jpg');
     const customMessage = 'This is a detailed error message for debugging';
     const updated = generations.failGeneration(gen.id, 'GENERATION_FAILED', customMessage);
     assertEqual(updated.errorMessage, customMessage, 'Should preserve error message');
@@ -646,7 +646,7 @@ function runErrorCodeTests() {
 
 function main() {
   console.log('='.repeat(50));
-  console.log('Trump Swap Unit Tests');
+  console.log('Pimp My Epstein Unit Tests');
   console.log('='.repeat(50));
   console.log('');
 
