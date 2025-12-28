@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const formidable = require('formidable');
+const { formidable } = require('formidable');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
