@@ -17,7 +17,7 @@ module.exports.config = config;
 /**
  * Add watermark to image buffer - visible but not obnoxious
  */
-async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
+async function addWatermark(inputBuffer, watermarkText = 'pimpmyepstein.lol') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
@@ -101,10 +101,10 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Your photo is required' });
     }
 
-    // Validate file type by MIME and extension
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    // Validate file type by MIME and extension (including HEIC/HEIF from iPhone/Samsung)
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
     if (!allowedMimes.includes(userPhotoFile.mimetype)) {
-      return res.status(400).json({ error: 'Only JPEG, PNG, and WebP images are allowed' });
+      return res.status(400).json({ error: 'Only JPEG, PNG, WebP, and HEIC images are allowed' });
     }
 
     // Get Epstein photo selection
@@ -138,31 +138,24 @@ module.exports = async function handler(req, res) {
       },
     });
 
-    // Create the prompt - emphasize style matching for authentic look
-    const prompt = `SEAMLESS PHOTO COMPOSITING TASK:
+    // Create the prompt - optimized for Nano Banana Pro based on Google's prompting guidance
+    const prompt = `Create a seamless photo composite where the person from the second image replaces another person (not Epstein) in the first image.
 
-You have two images:
-IMAGE 1: A vintage/archival photograph of Jeffrey Epstein with another person
-IMAGE 2: A photo of a new person to composite into the scene
+IDENTITY PRESERVATION (CRITICAL):
+Keep all facial features from the second image exactly unchanged - preserve face shape, eye spacing, nose structure, skin tone, and all distinctive features. Do not alter facial proportions, do not age or smooth the skin. Maintain natural skin texture with pores visible.
 
-YOUR TASK: Create a convincing composite where the person from IMAGE 2 appears in place of the other person (not Epstein) in IMAGE 1.
+STYLE MATCHING:
+Study the first image carefully. Apply the exact same color temperature, saturation, and tonal range to the composited person. If the original has warm, faded tones, the new person must have warm, faded tones. Match the film grain structure - add luminance-weighted grain, not color speckling. The composited person should not look "too clean" compared to the rest of the photograph.
 
-CRITICAL STYLE REQUIREMENTS - THE OUTPUT MUST LOOK AUTHENTIC:
-1. MATCH THE PHOTOGRAPHIC ERA: Study IMAGE 1's characteristics - the grain structure, color palette, contrast levels, slight blur/softness, and overall "feel" of when it was taken. Apply these SAME qualities to the composited person.
+LIGHTING:
+Match the direction and softness of light exactly as it falls on other subjects in the scene. Preserve the same shadow depth and highlight roll-off.
 
-2. COLOR GRADING: The person from IMAGE 2 must have the EXACT same color temperature, saturation levels, and tonal range as IMAGE 1. If IMAGE 1 looks warm and faded, the new person must look warm and faded too.
+COMPOSITION:
+Position at correct scale and perspective relative to Epstein. Natural, relaxed pose that fits the scene context. Seamless edge integration with no haloing or obvious compositing artifacts.
 
-3. FILM GRAIN & TEXTURE: Add matching film grain, compression artifacts, or digital noise so the new person doesn't look "too clean" compared to the rest of the photo.
+The final result should look like an authentic photograph taken in that moment - as if both people were actually standing together when the camera clicked. Not a digital edit, but a real photo.
 
-4. LIGHTING CONSISTENCY: Match the direction, softness, and intensity of light hitting the new person to match how light falls on Epstein and the environment in IMAGE 1.
-
-5. SCALE & PERSPECTIVE: Position the new person at the correct size and angle relative to Epstein and the scene.
-
-6. NATURAL POSE: The person should look relaxed and natural in the scene, as if they were actually standing there when the photo was taken.
-
-The goal is a photo that looks like it was taken in that moment - NOT like a modern face was digitally pasted onto an old photo. The new person should look like they BELONG in that era and setting.
-
-Generate the seamlessly composited photograph.`;
+Generate the composited photograph.`;
 
     // Make API request with both images
     const result = await model.generateContent([

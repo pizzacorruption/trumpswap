@@ -1820,7 +1820,7 @@
           </div>
           <div class="upload-text">DROP FILE OR CLICK TO UPLOAD</div>
           <div class="upload-hint">CLEAR FACE REQUIRED</div>
-          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif">
         </div>
         <div class="preview-container" id="previewContainer">
           <img class="preview-img" id="previewImg" alt="Your photo">
@@ -2884,10 +2884,19 @@
 
         const res = await fetch('/api/generate', fetchOptions);
 
-        const data = await res.json();
+        // Handle non-JSON error responses (e.g., from Express error middleware)
+        let data;
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          // Server returned non-JSON (plain text error)
+          const text = await res.text();
+          throw new Error(text || 'Server error - please try again');
+        }
 
-        if (data.error) {
-          throw new Error(data.error);
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Generation failed');
         }
 
         // Capture debug info for admin panel

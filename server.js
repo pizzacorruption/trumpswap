@@ -537,7 +537,7 @@ app.use(helmet({
   // SECURITY: XSS filter
   xssFilter: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Match multer's 10MB limit
 app.use(cookieParser()); // SECURITY: Required for httpOnly admin token cookies
 app.use(express.static('public'));
 // SECURITY: Don't serve /output statically - use authenticated endpoint instead
@@ -559,11 +559,12 @@ const upload = multer({
     files: 1 // Only allow 1 file per request
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    // Allow common mobile photo formats including HEIC/HEIF from iPhone/Samsung
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
     if (!allowedTypes.includes(file.mimetype)) {
-      const error = new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.');
+      const error = new Error('Invalid file type. Only JPEG, PNG, WebP, and HEIC are allowed.');
       error.code = ERROR_CODES.INVALID_FORMAT;
-      error.details = `Received: ${file.mimetype}. Accepted: image/jpeg, image/png, image/webp`;
+      error.details = `Received: ${file.mimetype}. Accepted: JPEG, PNG, WebP, HEIC/HEIF`;
       return cb(error);
     }
     cb(null, true);
@@ -708,12 +709,12 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
     // Validate file content using magic bytes (not just MIME type from header)
     const fileType = await import('file-type');
     const detectedType = await fileType.fileTypeFromBuffer(userPhoto.buffer);
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
     if (!detectedType || !allowedMimes.includes(detectedType.mime)) {
       logError(ERROR_CODES.INVALID_FORMAT, 'File content validation failed');
       return res.status(400).json(createErrorResponse(
         ERROR_CODES.INVALID_FORMAT,
-        'Invalid file content. Only JPEG, PNG, and WebP images are allowed.',
+        'Invalid file content. Only JPEG, PNG, WebP, and HEIC images are allowed.',
         `Detected type: ${detectedType?.mime || 'unknown'}. The file may be corrupted or disguised.`
       ));
     }
@@ -1464,6 +1465,17 @@ app.get('/api/admin/status', (req, res) => {
   res.json({
     isAdmin: req.isAdmin,
     adminConfigured: !!ADMIN_PASSWORD
+  });
+});
+
+// Global error handler - catches all unhandled errors and returns JSON
+// MUST be after all routes and middleware
+app.use((err, req, res, next) => {
+  console.error('[Global Error Handler]', err.message);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal server error',
+    code: err.code || 'INTERNAL_ERROR'
   });
 });
 
