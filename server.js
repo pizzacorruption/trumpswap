@@ -542,69 +542,39 @@ function handleMulterError(err, req, res, next) {
 });
 
 /**
- * Add watermark to image buffer - OBNOXIOUSLY PROMINENT like stock photo sites
+ * Add watermark to image buffer - visible but not obnoxious
  */
 async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
-  // OBNOXIOUS diagonal watermark pattern - hard to crop out
-  const fontSize = Math.floor(Math.min(width, height) / 12);
-  const smallFontSize = Math.floor(fontSize * 0.6);
+  const fontSize = Math.floor(Math.min(width, height) / 18);
+  const smallFontSize = Math.floor(fontSize * 0.7);
 
-  // Create diagonal repeating pattern across the entire image
   const svgText = `
     <svg width="${width}" height="${height}">
       <defs>
-        <!-- Main watermark pattern - diagonal repeating -->
-        <pattern id="watermarkPattern" width="${width * 0.5}" height="${height * 0.3}" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
-          <text x="10" y="${smallFontSize}" font-size="${smallFontSize}px" font-family="Impact, Arial Black, sans-serif" font-weight="bold" fill="rgba(255,0,0,0.35)" letter-spacing="0.05em">${watermarkText}</text>
-          <text x="${width * 0.25}" y="${smallFontSize * 2.5}" font-size="${smallFontSize}px" font-family="Impact, Arial Black, sans-serif" font-weight="bold" fill="rgba(255,255,0,0.3)" letter-spacing="0.05em">${watermarkText}</text>
+        <!-- Diagonal repeating pattern -->
+        <pattern id="watermarkPattern" width="${width * 0.45}" height="${height * 0.25}" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+          <text x="0" y="${smallFontSize}" font-size="${smallFontSize}px" font-family="Arial, sans-serif" font-weight="600" fill="rgba(255,255,255,0.15)">${watermarkText}</text>
         </pattern>
       </defs>
 
       <!-- Background pattern covering entire image -->
       <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
 
-      <!-- Giant center watermark with shadow -->
+      <!-- Center watermark with subtle shadow -->
       <text
         x="50%"
         y="50%"
         text-anchor="middle"
         dominant-baseline="middle"
         font-size="${fontSize}px"
-        font-family="Impact, Arial Black, sans-serif"
+        font-family="Arial, sans-serif"
         font-weight="bold"
-        letter-spacing="0.08em"
-        fill="rgba(0,0,0,0.5)"
-        transform="translate(3,3)"
+        fill="rgba(255,255,255,0.35)"
+        filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.5))"
       >${watermarkText}</text>
-      <text
-        x="50%"
-        y="50%"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-size="${fontSize}px"
-        font-family="Impact, Arial Black, sans-serif"
-        font-weight="bold"
-        letter-spacing="0.08em"
-        fill="rgba(255,0,0,0.7)"
-        stroke="rgba(255,255,255,0.8)"
-        stroke-width="2"
-      >${watermarkText}</text>
-
-      <!-- Bottom banner -->
-      <rect x="0" y="${height - fontSize * 1.5}" width="100%" height="${fontSize * 1.5}" fill="rgba(0,0,0,0.6)" />
-      <text
-        x="50%"
-        y="${height - fontSize * 0.4}"
-        text-anchor="middle"
-        font-size="${smallFontSize}px"
-        font-family="Impact, Arial Black, sans-serif"
-        font-weight="bold"
-        fill="#ff0"
-        letter-spacing="0.1em"
-      >FREE TIER - UPGRADE TO REMOVE WATERMARK</text>
     </svg>
   `;
 
@@ -734,27 +704,31 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       },
     });
 
-    // Create the prompt - replace the WHOLE PERSON next to Epstein, KEEP THEIR CLOTHES
-    const prompt = `COMPOSITE PHOTO TASK
+    // Create the prompt - emphasize style matching for authentic look
+    const prompt = `SEAMLESS PHOTO COMPOSITING TASK:
 
-Look at these two images:
-- IMAGE 1: Jeffrey Epstein with someone else
-- IMAGE 2: A person in casual clothes
+You have two images:
+IMAGE 1: A vintage/archival photograph of Jeffrey Epstein with another person
+IMAGE 2: A photo of a new person to composite into the scene
 
-Create a NEW composite image where the person from IMAGE 2 is standing next to Jeffrey Epstein instead of whoever was there before.
+YOUR TASK: Create a convincing composite where the person from IMAGE 2 appears in place of the other person (not Epstein) in IMAGE 1.
 
-⚠️ MOST IMPORTANT RULE - CLOTHING:
-The person from IMAGE 2 must wear EXACTLY what they're wearing in their photo. If IMAGE 2 shows them in a t-shirt, jeans, hoodie, or any casual outfit - they MUST appear in that SAME outfit in the final image. Do NOT dress them in a suit. Do NOT make them look formal. Copy their exact outfit from IMAGE 2.
+CRITICAL STYLE REQUIREMENTS - THE OUTPUT MUST LOOK AUTHENTIC:
+1. MATCH THE PHOTOGRAPHIC ERA: Study IMAGE 1's characteristics - the grain structure, color palette, contrast levels, slight blur/softness, and overall "feel" of when it was taken. Apply these SAME qualities to the composited person.
 
-This is meant to be FUNNY - someone in casual everyday clothes standing next to Jeffrey Epstein in a formal setting. The humor comes from the contrast. Preserve their casual clothes!
+2. COLOR GRADING: The person from IMAGE 2 must have the EXACT same color temperature, saturation levels, and tonal range as IMAGE 1. If IMAGE 1 looks warm and faded, the new person must look warm and faded too.
 
-Other rules:
-- Jeffrey Epstein stays exactly as he is
-- Background from IMAGE 1 stays
-- Make lighting look natural
-- Person from IMAGE 2 keeps their face, hair, glasses, body type
+3. FILM GRAIN & TEXTURE: Add matching film grain, compression artifacts, or digital noise so the new person doesn't look "too clean" compared to the rest of the photo.
 
-Generate the composite image with the person wearing their ORIGINAL CLOTHES from IMAGE 2.`;
+4. LIGHTING CONSISTENCY: Match the direction, softness, and intensity of light hitting the new person to match how light falls on Epstein and the environment in IMAGE 1.
+
+5. SCALE & PERSPECTIVE: Position the new person at the correct size and angle relative to Epstein and the scene.
+
+6. NATURAL POSE: The person should look relaxed and natural in the scene, as if they were actually standing there when the photo was taken.
+
+The goal is a photo that looks like it was taken in that moment - NOT like a modern face was digitally pasted onto an old photo. The new person should look like they BELONG in that era and setting.
+
+Generate the seamlessly composited photograph.`;
 
     // Make API request with both images (with timeout protection)
     let result;
