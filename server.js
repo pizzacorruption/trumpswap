@@ -542,32 +542,69 @@ function handleMulterError(err, req, res, next) {
 });
 
 /**
- * Add watermark to image buffer - subtle horizontal style like SHOWFEETS
+ * Add watermark to image buffer - OBNOXIOUSLY PROMINENT like stock photo sites
  */
 async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
-  // Subtle horizontal watermark - smaller, more transparent
-  const fontSize = Math.floor(Math.min(width, height) / 18);
+  // OBNOXIOUS diagonal watermark pattern - hard to crop out
+  const fontSize = Math.floor(Math.min(width, height) / 12);
+  const smallFontSize = Math.floor(fontSize * 0.6);
+
+  // Create diagonal repeating pattern across the entire image
   const svgText = `
     <svg width="${width}" height="${height}">
-      <style>
-        .watermark {
-          fill: rgba(255, 255, 255, 0.15);
-          font-size: ${fontSize}px;
-          font-family: Arial, sans-serif;
-          font-weight: bold;
-          letter-spacing: 0.1em;
-        }
-      </style>
+      <defs>
+        <!-- Main watermark pattern - diagonal repeating -->
+        <pattern id="watermarkPattern" width="${width * 0.5}" height="${height * 0.3}" patternUnits="userSpaceOnUse" patternTransform="rotate(-25)">
+          <text x="10" y="${smallFontSize}" font-size="${smallFontSize}px" font-family="Impact, Arial Black, sans-serif" font-weight="bold" fill="rgba(255,0,0,0.35)" letter-spacing="0.05em">${watermarkText}</text>
+          <text x="${width * 0.25}" y="${smallFontSize * 2.5}" font-size="${smallFontSize}px" font-family="Impact, Arial Black, sans-serif" font-weight="bold" fill="rgba(255,255,0,0.3)" letter-spacing="0.05em">${watermarkText}</text>
+        </pattern>
+      </defs>
+
+      <!-- Background pattern covering entire image -->
+      <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
+
+      <!-- Giant center watermark with shadow -->
       <text
         x="50%"
         y="50%"
         text-anchor="middle"
         dominant-baseline="middle"
-        class="watermark"
+        font-size="${fontSize}px"
+        font-family="Impact, Arial Black, sans-serif"
+        font-weight="bold"
+        letter-spacing="0.08em"
+        fill="rgba(0,0,0,0.5)"
+        transform="translate(3,3)"
       >${watermarkText}</text>
+      <text
+        x="50%"
+        y="50%"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-size="${fontSize}px"
+        font-family="Impact, Arial Black, sans-serif"
+        font-weight="bold"
+        letter-spacing="0.08em"
+        fill="rgba(255,0,0,0.7)"
+        stroke="rgba(255,255,255,0.8)"
+        stroke-width="2"
+      >${watermarkText}</text>
+
+      <!-- Bottom banner -->
+      <rect x="0" y="${height - fontSize * 1.5}" width="100%" height="${fontSize * 1.5}" fill="rgba(0,0,0,0.6)" />
+      <text
+        x="50%"
+        y="${height - fontSize * 0.4}"
+        text-anchor="middle"
+        font-size="${smallFontSize}px"
+        font-family="Impact, Arial Black, sans-serif"
+        font-weight="bold"
+        fill="#ff0"
+        letter-spacing="0.1em"
+      >FREE TIER - UPGRADE TO REMOVE WATERMARK</text>
     </svg>
   `;
 
