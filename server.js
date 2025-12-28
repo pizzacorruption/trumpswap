@@ -9,6 +9,7 @@ const multer = require('multer');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
@@ -271,11 +272,15 @@ function isValidAdminToken(token) {
 }
 
 /**
- * Middleware to check admin status from header or query param
+ * Middleware to check admin status from httpOnly cookie, header, or query param
+ * SECURITY: Prefers httpOnly cookie (XSS-proof) over header/query
  */
 function checkAdminMiddleware(req, res, next) {
-  // Check for admin token in header or query
-  const token = req.headers['x-admin-token'] || req.query.adminToken;
+  // Check for admin token in order of security preference:
+  // 1. httpOnly cookie (most secure - cannot be stolen via XSS)
+  // 2. Header (for backwards compatibility)
+  // 3. Query param (least secure, for debugging)
+  const token = req.cookies?.adminToken || req.headers['x-admin-token'] || req.query.adminToken;
   req.isAdmin = isValidAdminToken(token);
   next();
 }
@@ -460,23 +465,83 @@ const checkoutLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limiter for output images - prevent enumeration attacks
+const outputLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// SECURITY: Restrict CORS to allowed origins only
+// This prevents malicious sites from making authenticated requests on behalf of users
+const allowedOrigins = [
+  'https://pimpmyepstein.lol',
+  'https://www.pimpmyepstein.lol',
+  process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,
+  process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:3000' : null,
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    // but only in development mode
+    if (!origin) {
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      // In production, require origin header
+      return callback(null, false);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`[CORS] Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token'],
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https://*.supabase.co", "https://api.stripe.com"],
+      frameAncestors: ["'none'"], // Prevent clickjacking
     },
   },
   crossOriginEmbedderPolicy: false,
+  // SECURITY: Prevent clickjacking by not allowing this site to be framed
+  frameguard: { action: 'deny' },
+  // SECURITY: Force HTTPS in production (HSTS)
+  hsts: process.env.NODE_ENV === 'production' ? {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  } : false,
+  // SECURITY: Hide X-Powered-By header to reduce fingerprinting
+  hidePoweredBy: true,
+  // SECURITY: Prevent MIME type sniffing
+  noSniff: true,
+  // SECURITY: XSS filter
+  xssFilter: true,
 }));
 app.use(express.json());
+app.use(cookieParser()); // SECURITY: Required for httpOnly admin token cookies
 app.use(express.static('public'));
-app.use('/output', express.static('output'));
+// SECURITY: Don't serve /output statically - use authenticated endpoint instead
+// app.use('/output', express.static('output'));
 app.use('/epstein-photos', express.static('public/epstein-photos'));
 
 // Apply auth middleware globally (non-blocking, just attaches user info)
@@ -544,7 +609,7 @@ function handleMulterError(err, req, res, next) {
 /**
  * Add watermark to image buffer - visible but not obnoxious
  */
-async function addWatermark(inputBuffer, watermarkText = 'PIMPMYEPSTEIN.LOL') {
+async function addWatermark(inputBuffer, watermarkText = 'pimpmyepstein.lol') {
   const metadata = await sharp(inputBuffer).metadata();
   const { width, height } = metadata;
 
@@ -678,7 +743,22 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       console.log(`   Generation ID: ${generationRecord.id}`);
     }
 
-    // Read the Epstein photo from disk
+    // SECURITY: Validate epsteinPhoto against whitelist to prevent path traversal attacks
+    // An attacker could send "../../.env" to read server secrets
+    const allowedPhotos = getEpsteinPhotos();
+    const normalizedPath = epsteinPhoto.startsWith('/') ? epsteinPhoto : `/${epsteinPhoto}`;
+    const isValidPhoto = allowedPhotos.some(p => p.path === normalizedPath || p.path === epsteinPhoto);
+
+    if (!isValidPhoto) {
+      logError(ERROR_CODES.GENERATION_FAILED, `Invalid epstein photo path (possible attack): ${epsteinPhoto}`);
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.GENERATION_FAILED,
+        'Invalid photo selection.',
+        'Please select a valid photo from the gallery.'
+      ));
+    }
+
+    // Read the Epstein photo from disk (safe now that we've validated against whitelist)
     const epsteinPhotoPath = path.join(__dirname, 'public', epsteinPhoto);
     if (!fs.existsSync(epsteinPhotoPath)) {
       logError(ERROR_CODES.GENERATION_FAILED, `Epstein photo not found: ${epsteinPhoto}`);
@@ -704,31 +784,24 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       },
     });
 
-    // Create the prompt - emphasize style matching for authentic look
-    const prompt = `SEAMLESS PHOTO COMPOSITING TASK:
+    // Create the prompt - optimized for Nano Banana Pro based on Google's prompting guidance
+    const prompt = `Create a seamless photo composite where the person from the second image replaces another person (not Epstein) in the first image.
 
-You have two images:
-IMAGE 1: A vintage/archival photograph of Jeffrey Epstein with another person
-IMAGE 2: A photo of a new person to composite into the scene
+IDENTITY PRESERVATION (CRITICAL):
+Keep all facial features from the second image exactly unchanged - preserve face shape, eye spacing, nose structure, skin tone, and all distinctive features. Do not alter facial proportions, do not age or smooth the skin. Maintain natural skin texture with pores visible.
 
-YOUR TASK: Create a convincing composite where the person from IMAGE 2 appears in place of the other person (not Epstein) in IMAGE 1.
+STYLE MATCHING:
+Study the first image carefully. Apply the exact same color temperature, saturation, and tonal range to the composited person. If the original has warm, faded tones, the new person must have warm, faded tones. Match the film grain structure - add luminance-weighted grain, not color speckling. The composited person should not look "too clean" compared to the rest of the photograph.
 
-CRITICAL STYLE REQUIREMENTS - THE OUTPUT MUST LOOK AUTHENTIC:
-1. MATCH THE PHOTOGRAPHIC ERA: Study IMAGE 1's characteristics - the grain structure, color palette, contrast levels, slight blur/softness, and overall "feel" of when it was taken. Apply these SAME qualities to the composited person.
+LIGHTING:
+Match the direction and softness of light exactly as it falls on other subjects in the scene. Preserve the same shadow depth and highlight roll-off.
 
-2. COLOR GRADING: The person from IMAGE 2 must have the EXACT same color temperature, saturation levels, and tonal range as IMAGE 1. If IMAGE 1 looks warm and faded, the new person must look warm and faded too.
+COMPOSITION:
+Position at correct scale and perspective relative to Epstein. Natural, relaxed pose that fits the scene context. Seamless edge integration with no haloing or obvious compositing artifacts.
 
-3. FILM GRAIN & TEXTURE: Add matching film grain, compression artifacts, or digital noise so the new person doesn't look "too clean" compared to the rest of the photo.
+The final result should look like an authentic photograph taken in that moment - as if both people were actually standing together when the camera clicked. Not a digital edit, but a real photo.
 
-4. LIGHTING CONSISTENCY: Match the direction, softness, and intensity of light hitting the new person to match how light falls on Epstein and the environment in IMAGE 1.
-
-5. SCALE & PERSPECTIVE: Position the new person at the correct size and angle relative to Epstein and the scene.
-
-6. NATURAL POSE: The person should look relaxed and natural in the scene, as if they were actually standing there when the photo was taken.
-
-The goal is a photo that looks like it was taken in that moment - NOT like a modern face was digitally pasted onto an old photo. The new person should look like they BELONG in that era and setting.
-
-Generate the seamlessly composited photograph.`;
+Generate the composited photograph.`;
 
     // Make API request with both images (with timeout protection)
     let result;
@@ -807,8 +880,8 @@ Generate the seamlessly composited photograph.`;
             imageBuffer = await addWatermark(imageBuffer);
           }
 
-          // Save the image
-          const filename = `epstein_${Date.now()}.png`;
+          // Save the image with UUID filename (prevents enumeration attacks)
+          const filename = `epstein_${require('crypto').randomUUID()}.png`;
           const outputPath = path.join('output', filename);
           fs.writeFileSync(outputPath, imageBuffer);
 
@@ -917,23 +990,18 @@ Generate the seamlessly composited photograph.`;
 /**
  * POST /api/create-checkout
  * Creates a Stripe checkout session for $20/mo Pro subscription
- * Body: { userId: string, email: string }
+ * SECURITY: Requires authentication and verifies userId matches authenticated user
  */
-app.post('/api/create-checkout', checkoutLimiter, async (req, res) => {
+app.post('/api/create-checkout', checkoutLimiter, requireAuth, async (req, res) => {
   try {
-    const { userId, email } = req.body;
+    // SECURITY: Use authenticated user's ID and email, not from request body
+    // This prevents attackers from creating checkout sessions for other users
+    const userId = req.user.id;
+    const email = req.user.email;
 
-    if (!userId || !email) {
+    if (!email) {
       return res.status(400).json({
-        error: 'userId and email are required'
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Invalid email format'
+        error: 'User email not found. Please sign in again.'
       });
     }
 
@@ -990,17 +1058,13 @@ app.post('/api/webhook/stripe',
 /**
  * GET /api/subscription
  * Returns the current user's subscription status
- * Query: ?userId=xxx
+ * SECURITY: Requires authentication - uses authenticated user's ID
  */
-app.get('/api/subscription', async (req, res) => {
+app.get('/api/subscription', requireAuth, async (req, res) => {
   try {
-    const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({
-        error: 'userId query parameter is required'
-      });
-    }
+    // SECURITY: Use authenticated user's ID, not from query parameter
+    // This prevents users from viewing other users' subscription status
+    const userId = req.user.id;
 
     const status = await stripeService.getSubscriptionStatus(userId);
 
@@ -1020,19 +1084,23 @@ app.get('/api/subscription', async (req, res) => {
 /**
  * POST /api/cancel-subscription
  * Cancels a user's subscription (at period end)
- * Body: { customerId: string }
+ * SECURITY: Requires authentication and verifies user owns the subscription
  */
-app.post('/api/cancel-subscription', async (req, res) => {
+app.post('/api/cancel-subscription', requireAuth, async (req, res) => {
   try {
-    const { customerId } = req.body;
+    const userId = req.user.id;
 
-    if (!customerId) {
+    // Get user's profile to find their Stripe customer ID
+    const profile = await getProfile(userId);
+    if (!profile?.stripe_customer_id) {
       return res.status(400).json({
-        error: 'customerId is required'
+        error: 'No subscription found for this user'
       });
     }
 
-    const result = await stripeService.cancelSubscription(customerId);
+    // SECURITY: Use customerId from user's profile, not from request body
+    // This prevents attackers from cancelling other users' subscriptions
+    const result = await stripeService.cancelSubscription(profile.stripe_customer_id);
 
     res.json(result);
   } catch (error) {
@@ -1169,6 +1237,74 @@ app.get('/api/generation/:id', async (req, res) => {
 });
 
 /**
+ * GET /output/:filename
+ * SECURITY: Serve generated images only to authorized users
+ * - Admin users can access any image
+ * - Authenticated users can access their own generations
+ * - Anonymous users need a valid viewToken
+ */
+app.get('/output/:filename', outputLimiter, async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { viewToken } = req.query;
+    const userId = req.user?.id || null;
+
+    // Sanitize filename to prevent path traversal
+    const sanitizedFilename = path.basename(filename);
+    if (sanitizedFilename !== filename || filename.includes('..')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const resultUrl = `/output/${sanitizedFilename}`;
+    const filePath = path.join(__dirname, 'output', sanitizedFilename);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Admin users can access any image
+    if (req.isAdmin) {
+      return res.sendFile(filePath);
+    }
+
+    // In development mode, serve files without strict auth (for testing)
+    // This is safe because dev server is localhost only
+    if (process.env.NODE_ENV === 'development') {
+      return res.sendFile(filePath);
+    }
+
+    // Find the generation record for this image
+    const generation = generations.findByResultUrl(resultUrl);
+
+    if (!generation) {
+      // If no generation record, deny access (legacy images or direct file access attempt)
+      return res.status(403).json({
+        error: 'Access denied',
+        details: 'This image is not accessible without proper authorization'
+      });
+    }
+
+    // Validate access using the generation access rules
+    const { authorized, error } = generations.validateGenerationAccess(
+      generation.id,
+      userId,
+      viewToken
+    );
+
+    if (!authorized) {
+      return res.status(403).json({ error: error || 'Access denied' });
+    }
+
+    // Serve the file
+    res.sendFile(filePath);
+  } catch (error) {
+    console.error('Error serving output file:', error.message);
+    res.status(500).json({ error: 'Failed to serve image' });
+  }
+});
+
+/**
  * GET /api/config
  * Returns public client configuration (Supabase URL, etc.)
  */
@@ -1208,7 +1344,8 @@ app.get('/api/health', (req, res) => {
 
 /**
  * POST /api/admin/login
- * Authenticate with admin password to get session token
+ * Authenticate with admin password and set httpOnly session cookie
+ * SECURITY: Uses httpOnly cookie instead of returning token to JavaScript
  * Body: { password: string }
  */
 app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
@@ -1229,26 +1366,45 @@ app.post('/api/admin/login', adminLoginLimiter, (req, res) => {
     });
   }
 
-  console.log('[ADMIN] Successful login, token created');
+  console.log('[ADMIN] Successful login, setting httpOnly cookie');
+
+  // SECURITY: Set admin token as httpOnly cookie (cannot be read by JavaScript)
+  // This prevents XSS attacks from stealing the admin token
+  res.cookie('adminToken', result.token, {
+    httpOnly: true, // Cannot be accessed by JavaScript
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    sameSite: 'strict', // Prevents CSRF
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    path: '/'
+  });
+
   res.json({
     success: true,
-    token: result.token,
     expiresAt: result.expiresAt
+    // NOTE: Token is NOT returned - it's only in the httpOnly cookie
   });
 });
 
 /**
  * POST /api/admin/logout
- * Invalidate admin session token
- * Header: X-Admin-Token
+ * Invalidate admin session and clear cookie
  */
 app.post('/api/admin/logout', (req, res) => {
-  const token = req.headers['x-admin-token'];
+  // Get token from cookie or header for backwards compatibility
+  const token = req.cookies?.adminToken || req.headers['x-admin-token'];
 
   if (token && adminSessions.has(token)) {
     adminSessions.delete(token);
     console.log('[ADMIN] Session invalidated');
   }
+
+  // Clear the httpOnly cookie
+  res.clearCookie('adminToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/'
+  });
 
   res.json({ success: true });
 });

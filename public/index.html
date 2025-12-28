@@ -1742,7 +1742,7 @@
   <div class="auth-overlay" id="authOverlay">
     <div class="auth-card">
       <h1>PIMP MY EPSTEIN</h1>
-      <p class="subtitle">INJECT YOUR FACE INTO HISTORY</p>
+      <p class="subtitle">HANG OUT WITH EPSTEIN, USING AI</p>
       <div id="authOverlayContent">
         <p class="auth-loading-overlay">INITIALIZING SYSTEM...</p>
       </div>
@@ -1790,7 +1790,7 @@
 
     <header class="fade-in-up">
       <h1>PIMP MY EPSTEIN</h1>
-      <p class="subtitle">INJECT YOUR FACE INTO HISTORY</p>
+      <p class="subtitle">HANG OUT WITH EPSTEIN, USING AI</p>
       <div class="usage-badge" id="usageBadge">3 SWAPS REMAINING</div>
       <div class="parody-disclaimer">PARODY SITE — MEDIA LITERACY DEMO. MANIPULATED IMAGES ARE USED TO SHOW HOW EASY FAKES CAN BE.</div>
     </header>
@@ -1800,7 +1800,7 @@
 
       <!-- Step 1: Pick an Epstein photo -->
       <div class="card fade-in-up delay-1">
-        <div class="card-title">1. SELECT YOUR EPSTEIN SCENE</div>
+        <div class="card-title">1. SELECT YOUR EPSCENE</div>
         <div class="gallery" id="gallery">
           <!-- Photos loaded dynamically -->
         </div>
@@ -2018,7 +2018,9 @@
     let serverUsageCount = 0;
 
     // Admin state
-    let adminToken = localStorage.getItem('epsteinswap_admin_token') || null;
+    // SECURITY: Admin token is now stored in httpOnly cookie (not accessible via JavaScript)
+    // We track isAdmin state locally but verify with server on each admin action
+    let isAdminLoggedIn = false;
     let adminPanelVisible = false;
     let lastGenerationDebugInfo = null;
 
@@ -2299,13 +2301,15 @@
       upgradeBtn.textContent = 'Loading...';
 
       try {
+        // SECURITY: User info is now derived from authenticated session on server
+        // No need to send userId or email in the request body
         const res = await fetch('/api/create-checkout', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            email: currentUser.email
-          })
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+          },
+          credentials: 'include'
         });
 
         const data = await res.json();
@@ -2332,16 +2336,16 @@
     // ADMIN FUNCTIONS
     // =====================================================
 
-    // Check if admin token is valid
+    // Check if admin session is valid
+    // SECURITY: Cookie is sent automatically with credentials: 'include'
     async function checkAdminStatus() {
-      if (!adminToken) return false;
-
       try {
         const res = await fetch('/api/admin/status', {
-          headers: { 'X-Admin-Token': adminToken }
+          credentials: 'include' // Required for httpOnly cookies
         });
         const data = await res.json();
-        return data.isAdmin === true;
+        isAdminLoggedIn = data.isAdmin === true;
+        return isAdminLoggedIn;
       } catch (err) {
         console.error('Admin status check failed:', err);
         return false;
@@ -2349,11 +2353,13 @@
     }
 
     // Login as admin
+    // SECURITY: Token is stored in httpOnly cookie by server, not in JavaScript
     async function adminLogin(password) {
       try {
         const res = await fetch('/api/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Required for httpOnly cookies
           body: JSON.stringify({ password })
         });
 
@@ -2363,8 +2369,8 @@
           throw new Error(data.error || 'Login failed');
         }
 
-        adminToken = data.token;
-        localStorage.setItem('epsteinswap_admin_token', adminToken);
+        // Token is now in httpOnly cookie, we just track logged-in state
+        isAdminLoggedIn = true;
         return true;
       } catch (err) {
         throw err;
@@ -2372,30 +2378,29 @@
     }
 
     // Logout admin
+    // SECURITY: Server clears the httpOnly cookie
     async function adminLogout() {
       try {
-        if (adminToken) {
-          await fetch('/api/admin/logout', {
-            method: 'POST',
-            headers: { 'X-Admin-Token': adminToken }
-          });
-        }
+        await fetch('/api/admin/logout', {
+          method: 'POST',
+          credentials: 'include' // Required for httpOnly cookies
+        });
       } catch (err) {
         console.error('Admin logout error:', err);
       }
 
-      adminToken = null;
-      localStorage.removeItem('epsteinswap_admin_token');
+      isAdminLoggedIn = false;
       updateAdminUI(false);
     }
 
     // Fetch debug info
+    // SECURITY: Cookie is sent automatically with credentials: 'include'
     async function fetchDebugInfo() {
-      if (!adminToken) return null;
+      if (!isAdminLoggedIn) return null;
 
       try {
         const res = await fetch('/api/admin/debug', {
-          headers: { 'X-Admin-Token': adminToken }
+          credentials: 'include' // Required for httpOnly cookies
         });
 
         if (!res.ok) {
@@ -2595,16 +2600,12 @@
     }
 
     // Initialize admin
+    // SECURITY: Check if admin cookie is still valid on page load
     async function initAdmin() {
-      // Admin login only via modal (Ctrl+Shift+A) - never via URL parameters for security
-      if (adminToken) {
-        // Check if stored token is still valid
-        const isValid = await checkAdminStatus();
-        updateAdminUI(isValid);
-        if (!isValid) {
-          localStorage.removeItem('epsteinswap_admin_token');
-          adminToken = null;
-        }
+      // Check if there's a valid admin session via httpOnly cookie
+      const isValid = await checkAdminStatus();
+      if (isValid) {
+        updateAdminUI(true);
       }
     }
 
@@ -2655,7 +2656,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === 'A') {
         e.preventDefault();
-        if (adminToken) {
+        if (isAdminLoggedIn) {
           toggleAdminPanel();
         } else {
           showAdminLogin();
@@ -2832,7 +2833,7 @@
       if (!selectedPhoto || !userFile) return;
 
       // Usage limit enforcement (skip for debug mode, admins, and pro users)
-      if (!debugMode && !adminToken) {
+      if (!debugMode && !isAdminLoggedIn) {
         if (currentUser) {
           // Logged-in user
           if (userTier === 'pro') {
@@ -2869,7 +2870,8 @@
         const fetchOptions = {
           method: 'POST',
           body: formData,
-          headers: {}
+          headers: {},
+          credentials: 'include' // SECURITY: Required for httpOnly admin cookies
         };
 
         // Add Authorization header if we have a token
@@ -2877,10 +2879,8 @@
           fetchOptions.headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Add admin token if logged in as admin
-        if (adminToken) {
-          fetchOptions.headers['X-Admin-Token'] = adminToken;
-        }
+        // Admin token is now sent automatically via httpOnly cookie
+        // No need to manually add X-Admin-Token header
 
         const res = await fetch('/api/generate', fetchOptions);
 
