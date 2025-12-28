@@ -299,7 +299,7 @@ function getAdminDebugInfo() {
       stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
       supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
       adminConfigured: !!ADMIN_PASSWORD,
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-3-pro-image-preview',
       timeout: GEMINI_TIMEOUT,
       minImageSize: MIN_IMAGE_SIZE
     },
@@ -691,7 +691,7 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
     // Get the model - Nano Banana Pro (Gemini 3 Pro Image)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-3-pro-image-preview',
       generationConfig: {
         responseModalities: ['image', 'text'],
       },
@@ -820,7 +820,7 @@ Generate the composite image with the person wearing their ORIGINAL CLOTHES from
             const outputMetadata = await sharp(imageBuffer).metadata();
             response.debug = {
               generationTime: elapsedTime,
-              model: 'gemini-2.0-flash-exp',
+              model: 'gemini-3-pro-image-preview',
               outputDimensions: {
                 width: outputMetadata.width,
                 height: outputMetadata.height
