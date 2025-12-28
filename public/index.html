@@ -142,16 +142,30 @@
       position: relative;
     }
 
-    /* VHS timestamp style */
-    header::before {
-      content: 'REC ●';
+    /* VHS recording indicator - dynamic via JS */
+    .rec-indicator {
       position: absolute;
       top: -20px;
       right: 20px;
       color: #ff0000;
       font-family: 'VT323', monospace;
       font-size: 1rem;
+      letter-spacing: 1px;
       animation: blink 1s infinite;
+    }
+
+    .rec-indicator.disconnected {
+      animation: glitch 0.3s infinite;
+      color: #ff0000;
+    }
+
+    @keyframes glitch {
+      0% { transform: translate(0); opacity: 1; }
+      20% { transform: translate(-2px, 1px); opacity: 0.8; }
+      40% { transform: translate(2px, -1px); opacity: 0.9; }
+      60% { transform: translate(-1px, 2px); opacity: 0.7; }
+      80% { transform: translate(1px, -2px); opacity: 0.8; }
+      100% { transform: translate(0); opacity: 1; }
     }
 
     @keyframes blink {
@@ -890,6 +904,186 @@
     }
 
     /* Admin Panel Styles - CLASSIFIED */
+    /* Camera Button */
+    .btn-camera {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 12px 20px;
+      background: #00ff00;
+      color: #000;
+      border: 2px solid #000;
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .btn-camera:hover {
+      background: #ffff00;
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 #000;
+    }
+
+    .btn-camera:active {
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 #000;
+    }
+
+    .btn-camera svg {
+      width: 20px;
+      height: 20px;
+      stroke: #000;
+    }
+
+    /* Camera Overlay and Modal */
+    .camera-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.98);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .camera-overlay.visible {
+      display: flex;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .camera-modal {
+      background: #000;
+      border: 4px solid #00ff00;
+      padding: 20px;
+      width: 100%;
+      max-width: 600px;
+      position: relative;
+      box-shadow: 0 0 60px rgba(0, 255, 0, 0.3);
+    }
+
+    .camera-modal h2 {
+      color: #00ff00;
+      text-align: center;
+      font-family: 'VT323', monospace;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+      font-size: 1.3rem;
+    }
+
+    #cameraVideo {
+      width: 100%;
+      height: auto;
+      max-height: 60vh;
+      object-fit: contain;
+      background: #111;
+      border: 2px solid #00ff00;
+      border-radius: 4px;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .camera-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn-capture {
+      background: #00ff00;
+      color: #000;
+      border: 2px solid #000;
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'VT323', monospace;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      min-width: 200px;
+    }
+
+    .btn-capture:hover {
+      background: #ffff00;
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 #000;
+    }
+
+    .btn-capture:active {
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 #000;
+    }
+
+    .camera-hint {
+      color: #666;
+      font-size: 0.9rem;
+      font-family: 'VT323', monospace;
+      text-transform: uppercase;
+      text-align: center;
+      margin: 0;
+    }
+
+    .btn-camera-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      color: #00ff00;
+      cursor: pointer;
+      font-size: 2rem;
+      line-height: 1;
+      padding: 4px;
+      transition: all 0.2s ease;
+      font-family: 'VT323', monospace;
+      z-index: 10;
+    }
+
+    .btn-camera-close:hover {
+      color: #ff0000;
+      transform: rotate(90deg);
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+      .camera-modal {
+        padding: 16px;
+      }
+
+      .camera-modal h2 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+      }
+
+      #cameraVideo {
+        max-height: 50vh;
+        margin-bottom: 12px;
+      }
+
+      .btn-capture {
+        min-width: 160px;
+        padding: 10px 20px;
+        font-size: 0.9rem;
+      }
+
+      .camera-hint {
+        font-size: 0.8rem;
+      }
+    }
+
     .admin-overlay {
       display: none;
       position: fixed;
@@ -1789,6 +1983,7 @@
     </div>
 
     <header class="fade-in-up">
+      <span class="rec-indicator" id="recIndicator">REC ●</span>
       <h1>PIMP MY EPSTEIN</h1>
       <p class="subtitle">HANG OUT WITH EPSTEIN, USING AI</p>
       <div class="usage-badge" id="usageBadge">3 SWAPS REMAINING</div>
@@ -1825,6 +2020,13 @@
         <div class="preview-container" id="previewContainer">
           <img class="preview-img" id="previewImg" alt="Your photo">
         </div>
+        <button class="btn-camera" id="cameraBtn" title="Open camera">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          TAKE PHOTO
+        </button>
       </div>
 
       <!-- Generate -->
@@ -1946,6 +2148,20 @@
     </div>
 
     <button class="btn-refresh-debug" id="refreshDebugBtn">Refresh Debug Info</button>
+  </div>
+
+  <!-- Camera Capture Modal -->
+  <div class="camera-overlay" id="cameraOverlay">
+    <div class="camera-modal">
+      <button class="btn-camera-close" id="cameraCancelBtn">&times;</button>
+      <h2>CAMERA CAPTURE</h2>
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <canvas id="captureCanvas" style="display: none;"></canvas>
+      <div class="camera-controls">
+        <button class="btn-capture" id="captureBtn">CAPTURE PHOTO</button>
+        <p class="camera-hint">Position your face clearly in the center</p>
+      </div>
+    </div>
   </div>
 
   <!-- Admin Login Modal -->
@@ -2768,6 +2984,103 @@
       }
     });
 
+    // =====================================================
+    // CAMERA CAPTURE FUNCTIONALITY
+    // =====================================================
+
+    const cameraBtn = document.getElementById('cameraBtn');
+    const cameraOverlay = document.getElementById('cameraOverlay');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const cameraCancelBtn = document.getElementById('cameraCancelBtn');
+
+    let cameraStream = null;
+
+    // Open camera
+    cameraBtn.addEventListener('click', async () => {
+      try {
+        // Request camera access with optimal constraints for face capture
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        cameraVideo.srcObject = cameraStream;
+        cameraOverlay.classList.add('visible');
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          showError('Camera permission denied. Please enable camera access in your browser settings.');
+        } else if (err.name === 'NotFoundError') {
+          showError('No camera found on this device.');
+        } else {
+          showError('Unable to access camera: ' + err.message);
+        }
+      }
+    });
+
+    // Capture photo from video
+    captureBtn.addEventListener('click', () => {
+      if (!cameraStream) return;
+
+      // Get video dimensions
+      const videoWidth = cameraVideo.videoWidth;
+      const videoHeight = cameraVideo.videoHeight;
+
+      // Set canvas dimensions to match video
+      captureCanvas.width = videoWidth;
+      captureCanvas.height = videoHeight;
+
+      // Draw video frame to canvas
+      const ctx = captureCanvas.getContext('2d');
+      ctx.drawImage(cameraVideo, 0, 0, videoWidth, videoHeight);
+
+      // Convert canvas to blob and create File
+      captureCanvas.toBlob((blob) => {
+        const file = new File([blob], 'camera-capture.jpg', {
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+
+        // Handle the captured file
+        handleFile(file);
+
+        // Close camera modal
+        closeCameraModal();
+      }, 'image/jpeg', 0.95);
+    });
+
+    // Close camera modal
+    function closeCameraModal() {
+      cameraOverlay.classList.remove('visible');
+      stopCamera();
+    }
+
+    cameraCancelBtn.addEventListener('click', closeCameraModal);
+
+    // Close modal when clicking outside the modal box
+    cameraOverlay.addEventListener('click', (e) => {
+      if (e.target === cameraOverlay) {
+        closeCameraModal();
+      }
+    });
+
+    // Stop camera stream
+    function stopCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+        cameraVideo.srcObject = null;
+      }
+    }
+
+    // Clean up camera on page unload
+    window.addEventListener('beforeunload', stopCamera);
+
     // Maximum file size: 10MB
     const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -2801,6 +3114,42 @@
       // Keep tracking but don't enforce limit while developing
       const canGenerate = selectedPhoto && userFile;
       generateBtn.disabled = !canGenerate;
+    }
+
+    // Compress image client-side to avoid Vercel's 4.5MB payload limit
+    async function compressImage(file, maxDimension = 2048, quality = 0.85) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+
+          // Calculate new dimensions maintaining aspect ratio
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob((blob) => {
+            const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          }, 'image/jpeg', quality);
+        };
+        img.src = URL.createObjectURL(file);
+      });
     }
 
     // Loading message cycling
@@ -2859,8 +3208,25 @@
       loading.classList.add('visible');
       startLoadingMessages();
 
+      // Funny VHS effect - "camera disconnected" during generation
+      const recIndicator = document.getElementById('recIndicator');
+      const funnyMessages = [
+        'SIGNAL LOST',
+        'FEED INTERRUPTED',
+        'CAM MALFUNCTION',
+        'TAPE CORRUPTED',
+        'NO SIGNAL',
+        'EVIDENCE DELETED'
+      ];
+      recIndicator.textContent = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+      recIndicator.classList.add('disconnected');
+
+      // Compress image client-side to avoid Vercel's 4.5MB payload limit
+      const compressedFile = await compressImage(userFile, 2048, 0.85);
+      console.log(`Compressed: ${(userFile.size/1024/1024).toFixed(2)}MB → ${(compressedFile.size/1024/1024).toFixed(2)}MB`);
+
       const formData = new FormData();
-      formData.append('userPhoto', userFile);
+      formData.append('userPhoto', compressedFile);
       formData.append('epsteinPhoto', selectedPhoto);
       formData.append('debug', debugMode);
 
@@ -2922,6 +3288,8 @@
         }
 
         stopLoadingMessages();
+        recIndicator.textContent = 'REC ●';
+        recIndicator.classList.remove('disconnected');
         resultImage.src = data.imageUrl;
         loading.classList.remove('visible');
         result.classList.add('visible');
@@ -2929,6 +3297,8 @@
 
       } catch (err) {
         stopLoadingMessages();
+        recIndicator.textContent = 'REC ●';
+        recIndicator.classList.remove('disconnected');
         loading.classList.remove('visible');
         mainContent.style.display = 'block';
         showError(err.message);

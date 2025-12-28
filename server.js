@@ -27,6 +27,7 @@ const { createRateLimitMiddleware, getClientIP } = require('./middleware/rateLim
 // Lib & Config
 const { supabase, getClientConfig } = require('./lib/supabase');
 const tiers = require('./config/tiers');
+const { getPromptForPhoto, photoPrompts } = require('./config/photoPrompts');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -785,24 +786,9 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       },
     });
 
-    // Create the prompt - optimized for Nano Banana Pro based on Google's prompting guidance
-    const prompt = `Create a seamless photo composite where the person from the second image replaces another person (not Epstein) in the first image.
-
-IDENTITY PRESERVATION (CRITICAL):
-Keep all facial features from the second image exactly unchanged - preserve face shape, eye spacing, nose structure, skin tone, and all distinctive features. Do not alter facial proportions, do not age or smooth the skin. Maintain natural skin texture with pores visible.
-
-STYLE MATCHING:
-Study the first image carefully. Apply the exact same color temperature, saturation, and tonal range to the composited person. If the original has warm, faded tones, the new person must have warm, faded tones. Match the film grain structure - add luminance-weighted grain, not color speckling. The composited person should not look "too clean" compared to the rest of the photograph.
-
-LIGHTING:
-Match the direction and softness of light exactly as it falls on other subjects in the scene. Preserve the same shadow depth and highlight roll-off.
-
-COMPOSITION:
-Position at correct scale and perspective relative to Epstein. Natural, relaxed pose that fits the scene context. Seamless edge integration with no haloing or obvious compositing artifacts.
-
-The final result should look like an authentic photograph taken in that moment - as if both people were actually standing together when the camera clicked. Not a digital edit, but a real photo.
-
-Generate the composited photograph.`;
+    // Get per-photo custom prompt (or default if none exists)
+    const prompt = getPromptForPhoto(epsteinPhoto);
+    console.log(`   Using ${photoPrompts[epsteinPhoto.split('/').pop()] ? 'custom' : 'default'} prompt for: ${epsteinPhoto.split('/').pop()}`);
 
     // Make API request with both images (with timeout protection)
     let result;
