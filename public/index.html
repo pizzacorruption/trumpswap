@@ -1754,12 +1754,12 @@
           <span class="usage-counter-text">Generations:</span>
           <span class="usage-counter-value" id="usageCounterValue">0 / 3</span>
         </div>
-        <a href="/upgrade" class="btn-upgrade auth-hidden" id="upgradeBtn">
+        <button class="btn-upgrade auth-hidden" id="upgradeBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
           Upgrade to Pro
-        </a>
+        </button>
         <div class="user-info">
           <span class="user-name" id="userName">User</span>
           <span class="user-tier free" id="userTier">Free</span>
@@ -2267,6 +2267,46 @@
     // Auth event listeners
     googleSignInBtn.addEventListener('click', signInWithGoogle);
     logoutBtn.addEventListener('click', signOut);
+
+    // Upgrade to Pro - Stripe Checkout
+    upgradeBtn.addEventListener('click', async () => {
+      if (!currentUser) {
+        showError('Please sign in first to upgrade to Pro');
+        return;
+      }
+
+      upgradeBtn.disabled = true;
+      upgradeBtn.textContent = 'Loading...';
+
+      try {
+        const res = await fetch('/api/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            email: currentUser.email
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error(data.error || 'Failed to create checkout session');
+        }
+      } catch (err) {
+        console.error('Checkout error:', err);
+        showError('Failed to start checkout: ' + err.message);
+        upgradeBtn.disabled = false;
+        upgradeBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          Upgrade to Pro
+        `;
+      }
+    });
 
     // =====================================================
     // ADMIN FUNCTIONS
