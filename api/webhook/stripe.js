@@ -9,7 +9,7 @@
  */
 
 const Stripe = require('stripe');
-const { createServerClient } = require('../../lib/supabase');
+const { createAdminClient } = require('../../lib/supabase');
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -38,18 +38,19 @@ async function getRawBody(req) {
 
 /**
  * Update user profile in Supabase
+ * Uses admin client to bypass RLS for webhook-triggered updates
  * @param {string} userId - User ID from metadata
  * @param {object} updates - Fields to update
  */
 async function updateUserProfile(userId, updates) {
-  const supabase = createServerClient();
+  const supabaseAdmin = createAdminClient();
 
-  if (!supabase) {
-    console.error('Supabase not configured - cannot update user profile');
-    return { error: new Error('Supabase not configured') };
+  if (!supabaseAdmin) {
+    console.error('Supabase admin client not configured - cannot update user profile');
+    return { error: new Error('Supabase admin client not configured') };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', userId)
@@ -67,16 +68,17 @@ async function updateUserProfile(userId, updates) {
 
 /**
  * Find user by Stripe customer ID
+ * Uses admin client to bypass RLS
  * @param {string} customerId - Stripe customer ID
  */
 async function findUserByCustomerId(customerId) {
-  const supabase = createServerClient();
+  const supabaseAdmin = createAdminClient();
 
-  if (!supabase) {
-    return { user: null, error: new Error('Supabase not configured') };
+  if (!supabaseAdmin) {
+    return { user: null, error: new Error('Supabase admin client not configured') };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id')
     .eq('stripe_customer_id', customerId)
@@ -104,7 +106,7 @@ async function handleCheckoutCompleted(session) {
   }
 
   const { error } = await updateUserProfile(userId, {
-    subscription_status: 'active',
+    tier: 'paid',
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
     updated_at: new Date().toISOString()
@@ -136,30 +138,26 @@ async function handleSubscriptionUpdated(subscription) {
     return { success: false, message: 'Could not identify user' };
   }
 
-  // Map Stripe subscription status to our subscription_status
-  let subscriptionStatus;
+  // Map Stripe subscription status to tier ('paid' or 'free')
+  // Active/trialing subscriptions get 'paid' tier, everything else is 'free'
+  let tier;
   switch (subscription.status) {
     case 'active':
     case 'trialing':
-      subscriptionStatus = 'active';
+      tier = 'paid';
       break;
     case 'past_due':
-      subscriptionStatus = 'past_due';
-      break;
     case 'canceled':
     case 'unpaid':
-      subscriptionStatus = 'canceled';
-      break;
     case 'incomplete':
     case 'incomplete_expired':
-      subscriptionStatus = 'incomplete';
-      break;
     default:
-      subscriptionStatus = subscription.status;
+      tier = 'free';
+      break;
   }
 
   const { error } = await updateUserProfile(userId, {
-    subscription_status: subscriptionStatus,
+    tier,
     updated_at: new Date().toISOString()
   });
 
@@ -167,8 +165,8 @@ async function handleSubscriptionUpdated(subscription) {
     return { success: false, message: error.message };
   }
 
-  console.log(`Subscription updated for user ${userId}: ${subscriptionStatus}`);
-  return { success: true, message: 'Subscription updated' };
+  console.log(`Subscription updated for user ${userId}: tier=${tier} (stripe status: ${subscription.status})`);
+  return { success: true, message: 'Subscription updated', tier };
 }
 
 /**
@@ -190,7 +188,7 @@ async function handleSubscriptionDeleted(subscription) {
   }
 
   const { error } = await updateUserProfile(userId, {
-    subscription_status: 'canceled',
+    tier: 'free',
     stripe_subscription_id: null,
     updated_at: new Date().toISOString()
   });
@@ -199,8 +197,8 @@ async function handleSubscriptionDeleted(subscription) {
     return { success: false, message: error.message };
   }
 
-  console.log(`Subscription deleted for user ${userId}`);
-  return { success: true, message: 'Subscription canceled' };
+  console.log(`Subscription deleted for user ${userId}: tier=free`);
+  return { success: true, message: 'Subscription canceled', tier: 'free' };
 }
 
 /**

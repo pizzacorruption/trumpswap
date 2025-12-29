@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
@@ -25,12 +26,21 @@ const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { createRateLimitMiddleware, getClientIP } = require('./middleware/rateLimit');
 
 // Lib & Config
-const { supabase, getClientConfig } = require('./lib/supabase');
+const { supabase, supabaseAdmin, getClientConfig } = require('./lib/supabase');
 const tiers = require('./config/tiers');
 const { getPromptForPhoto, photoPrompts } = require('./config/photoPrompts');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// SECURITY: Trust proxy setting for Vercel deployment
+// This ensures req.ip uses the real client IP from x-forwarded-for header
+// Only trust the first proxy (Vercel's edge) to prevent IP spoofing attacks
+// Value of 1 means: trust only the first hop (immediate proxy)
+// This is critical for rate limiting to work correctly
+if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+  app.set('trust proxy', 1);
+}
 
 // API timeout for Gemini requests (in milliseconds)
 const GEMINI_TIMEOUT = 120000; // 2 minutes
@@ -273,15 +283,16 @@ function isValidAdminToken(token) {
 }
 
 /**
- * Middleware to check admin status from httpOnly cookie, header, or query param
- * SECURITY: Prefers httpOnly cookie (XSS-proof) over header/query
+ * Middleware to check admin status from httpOnly cookie or header
+ * SECURITY: Only accepts token from httpOnly cookie (XSS-proof) or header
+ * Query params are NOT accepted to prevent token leakage via referrer/logs
  */
 function checkAdminMiddleware(req, res, next) {
   // Check for admin token in order of security preference:
   // 1. httpOnly cookie (most secure - cannot be stolen via XSS)
-  // 2. Header (for backwards compatibility)
-  // 3. Query param (least secure, for debugging)
-  const token = req.cookies?.adminToken || req.headers['x-admin-token'] || req.query.adminToken;
+  // 2. Header (for API/programmatic access)
+  // NOTE: Query params intentionally NOT supported - tokens in URLs leak via referrer headers and server logs
+  const token = req.cookies?.adminToken || req.headers['x-admin-token'];
   req.isAdmin = isValidAdminToken(token);
   next();
 }
@@ -328,14 +339,15 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 /**
  * Get user profile from Supabase
+ * Uses supabaseAdmin (service role key) to bypass RLS policies
  * @param {string} userId - User ID
  * @returns {object|null} User profile or null
  */
 async function getProfile(userId) {
-  if (!supabase || !userId) return null;
+  if (!supabaseAdmin || !userId) return null;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -355,15 +367,16 @@ async function getProfile(userId) {
 
 /**
  * Update user profile in Supabase
+ * Uses supabaseAdmin (service role key) to bypass RLS policies
  * @param {string} userId - User ID
  * @param {object} updates - Fields to update
  * @returns {boolean} Success status
  */
 async function updateProfile(userId, updates) {
-  if (!supabase || !userId) return false;
+  if (!supabaseAdmin || !userId) return false;
 
   try {
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('profiles')
       .update(updates)
       .eq('id', userId);
@@ -390,12 +403,14 @@ const rateLimitMiddleware = createRateLimitMiddleware({
 // ===== GLOBAL RATE LIMITING & ABUSE DETECTION =====
 
 // Global rate limiter for /api/generate - prevents API key abuse
+// SECURITY: keyGenerator uses req.ip which respects 'trust proxy' setting
 const globalGenerateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 100, // 100 total generations per hour across ALL users
   message: { error: 'Service temporarily at capacity. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 // Suspicious IP tracking for abuse detection
@@ -408,14 +423,27 @@ const suspiciousIPs = new Map(); // IP -> { count, firstSeen, lastSeen }
  */
 function trackSuspiciousActivity(ip) {
   const now = Date.now();
-  const record = suspiciousIPs.get(ip) || { count: 0, firstSeen: now };
+  const fiveMinutes = 5 * 60 * 1000;
+  const fiveMinutesAgo = now - fiveMinutes;
+
+  let record = suspiciousIPs.get(ip);
+
+  // Reset the window if it's been more than 5 minutes since firstSeen
+  if (record && record.firstSeen < fiveMinutesAgo) {
+    // Window expired - reset the record
+    record = null;
+  }
+
+  if (!record) {
+    record = { count: 0, firstSeen: now };
+  }
+
   record.count++;
   record.lastSeen = now;
   suspiciousIPs.set(ip, record);
 
   // Block if more than 10 requests in 5 minutes
-  const fiveMinutesAgo = now - (5 * 60 * 1000);
-  if (record.count > 10 && record.firstSeen > fiveMinutesAgo) {
+  if (record.count > 10) {
     const timespan = Math.round((now - record.firstSeen) / 1000);
     console.log(`[ABUSE] IP ${ip} attempted ${record.count} generations in ${timespan}s - BLOCKED`);
     return true; // Block this IP
@@ -455,6 +483,7 @@ const adminLoginLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 // Rate limiter for checkout creation - prevent abuse
@@ -464,6 +493,7 @@ const checkoutLimiter = rateLimit({
   message: { error: 'Too many checkout attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 // Rate limiter for output images - prevent enumeration attacks
@@ -473,6 +503,7 @@ const outputLimiter = rateLimit({
   message: { error: 'Too many requests' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.ip || 'unknown',
 });
 
 // SECURITY: Restrict CORS to allowed origins only
@@ -507,6 +538,71 @@ const corsOptions = {
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token'],
 };
+
+// ===== STRIPE WEBHOOK ROUTE (MUST BE BEFORE express.json()) =====
+// Stripe webhook signature verification requires the raw request body.
+// express.json() middleware consumes and parses the body, making it unavailable
+// for signature verification. This route MUST be defined before express.json().
+app.post('/api/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature header' });
+    }
+
+    try {
+      // Verify and construct the webhook event
+      const event = stripeService.constructWebhookEvent(req.body, signature);
+
+      console.log(`Stripe webhook received: ${event.type}`);
+
+      // Handle the event
+      const result = await stripeService.handleWebhook(event);
+
+      // If we have a userId and tier changed, update Supabase profile
+      // Use supabaseAdmin to bypass RLS since webhooks have no user context
+      if (result.userId && result.tier && supabaseAdmin) {
+        try {
+          // Build update object with tier and optional Stripe IDs
+          const updateData = { tier: result.tier };
+
+          // Include stripe_customer_id if present in result
+          if (result.stripe_customer_id) {
+            updateData.stripe_customer_id = result.stripe_customer_id;
+          }
+
+          // Include stripe_subscription_id (can be null to clear it on cancel)
+          if ('stripe_subscription_id' in result) {
+            updateData.stripe_subscription_id = result.stripe_subscription_id;
+          }
+
+          const { error } = await supabaseAdmin
+            .from('profiles')
+            .update(updateData)
+            .eq('id', result.userId);
+
+          if (error) {
+            console.error('Failed to update Supabase profile:', error.message);
+          } else {
+            console.log(`Updated Supabase profile for user ${result.userId}:`, updateData);
+          }
+        } catch (dbError) {
+          console.error('Supabase profile update error:', dbError.message);
+        }
+      }
+
+      res.json({ received: true, ...result });
+    } catch (error) {
+      console.error('Webhook error:', error.message);
+      res.status(400).json({
+        error: 'Webhook signature verification failed',
+        details: error.message
+      });
+    }
+  }
+);
 
 // Middleware
 app.use(cors(corsOptions));
@@ -612,48 +708,55 @@ function handleMulterError(err, req, res, next) {
  * Add watermark to image buffer - visible but not obnoxious
  */
 async function addWatermark(inputBuffer, watermarkText = 'pimpmyepstein.lol') {
-  const metadata = await sharp(inputBuffer).metadata();
-  const { width, height } = metadata;
+  try {
+    const metadata = await sharp(inputBuffer).metadata();
+    const { width, height } = metadata;
 
-  const fontSize = Math.floor(Math.min(width, height) / 18);
-  const smallFontSize = Math.floor(fontSize * 0.7);
+    const fontSize = Math.floor(Math.min(width, height) / 18);
+    const smallFontSize = Math.floor(fontSize * 0.7);
 
-  const svgText = `
-    <svg width="${width}" height="${height}">
-      <defs>
-        <!-- Diagonal repeating pattern -->
-        <pattern id="watermarkPattern" width="${width * 0.45}" height="${height * 0.25}" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
-          <text x="0" y="${smallFontSize}" font-size="${smallFontSize}px" font-family="Arial, sans-serif" font-weight="600" fill="rgba(255,255,255,0.15)">${watermarkText}</text>
-        </pattern>
-      </defs>
+    // Calculate diagonal pattern spacing (no patternTransform - libvips doesn't support it)
+    const patternWidth = Math.floor(width * 0.4);
+    const patternHeight = Math.floor(height * 0.2);
 
-      <!-- Background pattern covering entire image -->
-      <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
+    // SVG without unsupported features (no drop-shadow filter, no patternTransform)
+    // libvips has limited SVG support - keep it simple
+    const svgText = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="watermarkPattern" width="${patternWidth}" height="${patternHeight}" patternUnits="userSpaceOnUse">
+            <text x="10" y="${smallFontSize + 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
+            <text x="${patternWidth / 2}" y="${patternHeight - 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
+        <text x="50%" y="48%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(0,0,0,0.3)">${watermarkText}</text>
+        <text x="50%" y="50%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(255,255,255,0.4)">${watermarkText}</text>
+      </svg>
+    `;
 
-      <!-- Center watermark with subtle shadow -->
-      <text
-        x="50%"
-        y="50%"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-size="${fontSize}px"
-        font-family="Arial, sans-serif"
-        font-weight="bold"
-        fill="rgba(255,255,255,0.35)"
-        filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.5))"
-      >${watermarkText}</text>
-    </svg>
-  `;
+    // Convert SVG to PNG buffer first (Sharp handles SVG better this way)
+    const svgBuffer = Buffer.from(svgText);
+    const watermarkPng = await sharp(svgBuffer, { density: 150 })
+      .resize(width, height, { fit: 'fill' })
+      .png()
+      .toBuffer();
 
-  const watermarkedBuffer = await sharp(inputBuffer)
-    .composite([{
-      input: Buffer.from(svgText),
-      gravity: 'center'
-    }])
-    .png()
-    .toBuffer();
+    // Composite the watermark PNG over the original image
+    const watermarkedBuffer = await sharp(inputBuffer)
+      .composite([{
+        input: watermarkPng,
+        blend: 'over'
+      }])
+      .png()
+      .toBuffer();
 
-  return watermarkedBuffer;
+    return watermarkedBuffer;
+  } catch (watermarkError) {
+    console.error('Watermark application failed:', watermarkError.message);
+    // Return original image if watermarking fails rather than crashing
+    return inputBuffer;
+  }
 }
 
 /**
@@ -697,7 +800,7 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
   try {
     const userPhoto = req.file;
-    const { epsteinPhoto, debug } = req.body;
+    const { epsteinPhoto } = req.body;
 
     if (!userPhoto) {
       return res.status(400).json(createErrorResponse(
@@ -739,11 +842,10 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       ));
     }
 
-    // Create generation record for tracking (for authenticated users)
-    if (userId) {
-      generationRecord = generations.createGeneration(userId, epsteinPhoto);
-      console.log(`   Generation ID: ${generationRecord.id}`);
-    }
+    // Create generation record for tracking (for ALL users, including anonymous)
+    // This enables secure image access via viewToken for anonymous users
+    generationRecord = generations.createGeneration(userId, epsteinPhoto);
+    console.log(`   Generation ID: ${generationRecord.id}${userId ? '' : ' (anonymous)'}`)
 
     // SECURITY: Validate epsteinPhoto against whitelist to prevent path traversal attacks
     // An attacker could send "../../.env" to read server secrets
@@ -760,8 +862,23 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       ));
     }
 
-    // Read the Epstein photo from disk (safe now that we've validated against whitelist)
-    const epsteinPhotoPath = path.join(__dirname, 'public', epsteinPhoto);
+    // Read the Epstein photo from disk
+    // SECURITY: Strip leading slash to prevent path.join treating it as absolute path
+    // Then use path.resolve and verify the result is within the allowed directory
+    const sanitizedPath = epsteinPhoto.replace(/^\/+/, ''); // Strip leading slashes
+    const epsteinPhotosDir = path.resolve(__dirname, 'public', 'epstein-photos');
+    const epsteinPhotoPath = path.resolve(__dirname, 'public', sanitizedPath);
+
+    // SECURITY: Verify the resolved path is within the epstein-photos directory
+    if (!epsteinPhotoPath.startsWith(epsteinPhotosDir + path.sep) && epsteinPhotoPath !== epsteinPhotosDir) {
+      logError(ERROR_CODES.GENERATION_FAILED, `Path traversal attempt blocked: ${epsteinPhoto} resolved to ${epsteinPhotoPath}`);
+      return res.status(400).json(createErrorResponse(
+        ERROR_CODES.GENERATION_FAILED,
+        'Invalid photo selection.',
+        'Please select a valid photo from the gallery.'
+      ));
+    }
+
     if (!fs.existsSync(epsteinPhotoPath)) {
       logError(ERROR_CODES.GENERATION_FAILED, `Epstein photo not found: ${epsteinPhoto}`);
       return res.status(400).json(createErrorResponse(
@@ -771,8 +888,17 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
       ));
     }
 
-    const epsteinPhotoBuffer = fs.readFileSync(epsteinPhotoPath);
-    const epsteinPhotoMime = epsteinPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const epsteinPhotoBuffer = await fsPromises.readFile(epsteinPhotoPath);
+
+    // Detect actual MIME type from file extension
+    const ext = path.extname(sanitizedPath).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+    };
+    const epsteinPhotoMime = mimeTypes[ext] || 'image/jpeg';
 
     console.log(`\n🎬 Generating Epstein swap...`);
     console.log(`   Epstein photo: ${epsteinPhoto}`);
@@ -860,9 +986,9 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
         if (part.inlineData) {
           let imageBuffer = Buffer.from(part.inlineData.data, 'base64');
 
-          // Add watermark (skip in debug mode or for admin users)
-          const isDebug = debug === 'true' || debug === true;
-          const skipWatermark = isDebug || req.isAdmin;
+          // Add watermark (skip only for authenticated admin users)
+          // SECURITY: Only trust req.isAdmin - never trust client-side debug parameter
+          const skipWatermark = req.isAdmin;
           if (!skipWatermark) {
             imageBuffer = await addWatermark(imageBuffer);
           }
@@ -870,9 +996,9 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
           // Save the image with UUID filename (prevents enumeration attacks)
           const filename = `epstein_${require('crypto').randomUUID()}.png`;
           const outputPath = path.join('output', filename);
-          fs.writeFileSync(outputPath, imageBuffer);
+          await fsPromises.writeFile(outputPath, imageBuffer);
 
-          console.log(`✅ Generated: ${filename}${isDebug ? ' (no watermark - debug)' : ''}${req.isAdmin ? ' [ADMIN]' : ''} (${elapsedTime}ms)`);
+          console.log(`✅ Generated: ${filename}${req.isAdmin ? ' [ADMIN - no watermark]' : ''} (${elapsedTime}ms)`);
 
           // Mark generation as completed for authenticated users
           if (generationRecord) {
@@ -883,7 +1009,9 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
           const response = {
             success: true,
             imageUrl: `/output/${filename}`,
-            generationId: generationRecord?.id || null
+            generationId: generationRecord?.id || null,
+            // Include viewToken for anonymous users so they can access their images
+            viewToken: generationRecord?.viewToken || null
           };
 
           // Add debug info for admin users
@@ -1009,40 +1137,6 @@ app.post('/api/create-checkout', checkoutLimiter, requireAuth, async (req, res) 
 });
 
 /**
- * POST /api/webhook/stripe
- * Handles Stripe webhook events (subscription updates, cancellations, etc.)
- * NOTE: This endpoint needs raw body parsing for signature verification
- */
-app.post('/api/webhook/stripe',
-  express.raw({ type: 'application/json' }),
-  async (req, res) => {
-    const signature = req.headers['stripe-signature'];
-
-    if (!signature) {
-      return res.status(400).json({ error: 'Missing stripe-signature header' });
-    }
-
-    try {
-      // Verify and construct the webhook event
-      const event = stripeService.constructWebhookEvent(req.body, signature);
-
-      console.log(`Stripe webhook received: ${event.type}`);
-
-      // Handle the event
-      const result = await stripeService.handleWebhook(event);
-
-      res.json({ received: true, ...result });
-    } catch (error) {
-      console.error('Webhook error:', error.message);
-      res.status(400).json({
-        error: 'Webhook signature verification failed',
-        details: error.message
-      });
-    }
-  }
-);
-
-/**
  * GET /api/subscription
  * Returns the current user's subscription status
  * SECURITY: Requires authentication - uses authenticated user's ID
@@ -1130,7 +1224,7 @@ app.get('/api/me', async (req, res) => {
       } : null,
       profile: profile ? {
         generation_count: profile.generation_count || 0,
-        subscription_status: profile.subscription_status || null,
+        tier: profile.tier || 'free',
         stripe_customer_id: profile.stripe_customer_id || null
       } : null,
       usage: {

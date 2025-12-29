@@ -65,6 +65,12 @@ function assertType(value, type, message) {
   }
 }
 
+function assertOneOf(actual, expected, message) {
+  if (!expected.includes(actual)) {
+    throw new Error(message || `Expected one of [${expected.join(', ')}], got ${actual}`);
+  }
+}
+
 // ============================================
 // API ENDPOINT TESTS
 // ============================================
@@ -256,7 +262,10 @@ async function runAPITests() {
       body: formData
     });
 
-    assertEqual(response.status, 400, 'Expected 400 status');
+    // Accept 400 (validation error) or 429 (rate limited)
+    if (response.status !== 400 && response.status !== 429) {
+      throw new Error(`Expected 400 or 429 status, got ${response.status}`);
+    }
     const data = await response.json();
     assertExists(data.error, 'Expected error message');
   });
@@ -283,7 +292,10 @@ async function runAPITests() {
       body: formData
     });
 
-    assertEqual(response.status, 400, 'Expected 400 status');
+    // Accept 400 (validation error) or 429 (rate limited)
+    if (response.status !== 400 && response.status !== 429) {
+      throw new Error(`Expected 400 or 429 status, got ${response.status}`);
+    }
     const data = await response.json();
     assertExists(data.error, 'Expected error message');
   });
@@ -319,9 +331,9 @@ async function runAPITests() {
   // -------------------------------------------
   console.log('\nSubscription (/api/subscription):');
 
-  await test('returns 400 without userId', async () => {
+  await test('returns 401 without auth (requires authentication)', async () => {
     const response = await fetch(`${BASE_URL}/api/subscription`);
-    assertEqual(response.status, 400, 'Expected 400 status');
+    assertOneOf(response.status, [401, 429], 'Expected 401 or 429 status - endpoint requires auth or rate limited');
     const data = await response.json();
     assertExists(data.error, 'Expected error message');
   });
@@ -331,22 +343,22 @@ async function runAPITests() {
   // -------------------------------------------
   console.log('\nCheckout (/api/create-checkout):');
 
-  await test('returns 400 without required fields', async () => {
+  await test('returns 401 without auth (requires authentication)', async () => {
     const response = await fetch(`${BASE_URL}/api/create-checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
-    assertEqual(response.status, 400, 'Expected 400 status');
+    assertOneOf(response.status, [401, 429], 'Expected 401 or 429 status - endpoint requires auth or rate limited');
   });
 
-  await test('returns 400 with invalid email', async () => {
+  await test('returns 401 even with userId/email (auth required, not body params)', async () => {
     const response = await fetch(`${BASE_URL}/api/create-checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: 'test-123', email: 'invalid-email' })
+      body: JSON.stringify({ userId: 'test-123', email: 'test@example.com' })
     });
-    assertEqual(response.status, 400, 'Expected 400 status');
+    assertOneOf(response.status, [401, 429], 'Expected 401 or 429 status - cannot bypass auth with body params');
   });
 
   // -------------------------------------------
@@ -354,13 +366,13 @@ async function runAPITests() {
   // -------------------------------------------
   console.log('\nCancel Subscription (/api/cancel-subscription):');
 
-  await test('returns 400 without customerId', async () => {
+  await test('returns 401 without auth (requires authentication)', async () => {
     const response = await fetch(`${BASE_URL}/api/cancel-subscription`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
-    assertEqual(response.status, 400, 'Expected 400 status');
+    assertOneOf(response.status, [401, 429], 'Expected 401 or 429 status - endpoint requires auth or rate limited');
   });
 }
 

@@ -108,12 +108,20 @@ async function handleWebhook(event) {
         console.log(`Upgraded user ${userId} to paid tier`);
       }
 
-      return { success: true, message: 'Subscription activated' };
+      return {
+        success: true,
+        message: 'Subscription activated',
+        userId,
+        tier: 'paid',
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscriptionId
+      };
     }
 
     case 'customer.subscription.updated': {
       const subscription = event.data.object;
       const userId = subscription.metadata?.userId;
+      let tier = null;
 
       if (userId) {
         const user = getUser(userId);
@@ -121,14 +129,23 @@ async function handleWebhook(event) {
         // Check subscription status
         if (subscription.status === 'active') {
           user.tier = 'paid';
+          tier = 'paid';
         } else if (['canceled', 'unpaid', 'past_due'].includes(subscription.status)) {
           user.tier = 'free';
+          tier = 'free';
         }
 
         console.log(`Updated user ${userId} subscription status: ${subscription.status}`);
       }
 
-      return { success: true, message: 'Subscription updated' };
+      return {
+        success: true,
+        message: 'Subscription updated',
+        userId,
+        tier,
+        stripe_customer_id: subscription.customer,
+        stripe_subscription_id: subscription.id
+      };
     }
 
     case 'customer.subscription.deleted': {
@@ -143,7 +160,14 @@ async function handleWebhook(event) {
         console.log(`Canceled subscription for user ${userId}`);
       }
 
-      return { success: true, message: 'Subscription canceled' };
+      return {
+        success: true,
+        message: 'Subscription canceled',
+        userId,
+        tier: 'free',
+        stripe_customer_id: subscription.customer,
+        stripe_subscription_id: null  // Clear subscription ID on cancel
+      };
     }
 
     case 'invoice.payment_failed': {
@@ -256,11 +280,46 @@ function constructWebhookEvent(rawBody, signature) {
   );
 }
 
+/**
+ * Get the userId associated with a Stripe customer
+ * Used for authorization checks to verify customer ownership
+ * @param {string} customerId - Stripe customer ID
+ * @returns {Promise<string|null>} The userId from customer metadata, or null if not found
+ */
+async function getUserIdForCustomer(customerId) {
+  if (!customerId) {
+    return null;
+  }
+
+  try {
+    // First check our in-memory store
+    for (const [userId, user] of users.entries()) {
+      if (user.stripe_customer_id === customerId) {
+        return userId;
+      }
+    }
+
+    // If not in memory, retrieve from Stripe
+    const customer = await stripe.customers.retrieve(customerId);
+
+    if (customer.deleted) {
+      return null;
+    }
+
+    // Return userId from metadata
+    return customer.metadata?.userId || null;
+  } catch (err) {
+    console.error(`Error retrieving customer ${customerId}:`, err.message);
+    return null;
+  }
+}
+
 module.exports = {
   createCheckoutSession,
   handleWebhook,
   cancelSubscription,
   getSubscriptionStatus,
   constructWebhookEvent,
+  getUserIdForCustomer,
   getUser
 };

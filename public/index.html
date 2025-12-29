@@ -2375,11 +2375,11 @@
       if (!currentUser) return;
 
       try {
-        const res = await fetchWithAuth('/api/user/usage');
+        const res = await fetchWithAuth('/api/me');
         if (res.ok) {
           const data = await res.json();
-          serverUsageCount = data.usageCount || 0;
-          userTier = data.tier || 'free';
+          serverUsageCount = data.usage?.used || 0;
+          userTier = data.usage?.tier || 'free';
           updateAuthUI();
         }
       } catch (err) {
@@ -3290,7 +3290,12 @@
         stopLoadingMessages();
         recIndicator.textContent = 'REC ●';
         recIndicator.classList.remove('disconnected');
-        resultImage.src = data.imageUrl;
+        // Append viewToken to URL for anonymous users to access their images
+        let imageUrl = data.imageUrl;
+        if (data.viewToken) {
+          imageUrl += `?viewToken=${data.viewToken}`;
+        }
+        resultImage.src = imageUrl;
         loading.classList.remove('visible');
         result.classList.add('visible');
         result.classList.add('animate-in');

@@ -164,16 +164,40 @@ function validateGenerationAccess(id, userId, viewToken) {
       return { authorized: false, generation: null, error: 'View token required for anonymous generations' };
     }
     // Validate the viewToken using timing-safe comparison
-    if (generation.viewToken && crypto.timingSafeEqual(
-      Buffer.from(viewToken),
-      Buffer.from(generation.viewToken)
-    )) {
-      return { authorized: true, generation, error: null };
+    // SECURITY: timingSafeEqual throws if buffer lengths differ, so check length first
+    // We still use timing-safe comparison to prevent timing attacks on valid-length tokens
+    if (generation.viewToken) {
+      const providedBuffer = Buffer.from(viewToken);
+      const storedBuffer = Buffer.from(generation.viewToken);
+
+      // Length mismatch = invalid token (return 403, not 500)
+      if (providedBuffer.length !== storedBuffer.length) {
+        return { authorized: false, generation: null, error: 'Invalid view token' };
+      }
+
+      // Timing-safe comparison for equal-length buffers
+      if (crypto.timingSafeEqual(providedBuffer, storedBuffer)) {
+        return { authorized: true, generation, error: null };
+      }
     }
     return { authorized: false, generation: null, error: 'Invalid view token' };
   }
 
   return { authorized: false, generation: null, error: 'Access denied' };
+}
+
+/**
+ * Find generation by result URL (for secure image serving)
+ * @param {string} resultUrl - The result URL path (e.g., '/output/epstein_xxx.png')
+ * @returns {object|null} The generation record or null if not found
+ */
+function findByResultUrl(resultUrl) {
+  for (const generation of generations.values()) {
+    if (generation.resultUrl === resultUrl) {
+      return generation;
+    }
+  }
+  return null;
 }
 
 /**
@@ -190,6 +214,7 @@ module.exports = {
   getGenerations,
   getGeneration,
   validateGenerationAccess,
+  findByResultUrl,
   clearAll,
   STATUS,
 };

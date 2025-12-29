@@ -8,19 +8,17 @@ const tiers = require('../config/tiers');
 
 /**
  * Get client IP address from request
- * Handles proxied requests (Vercel, Cloudflare, etc.)
+ * SECURITY: Uses req.ip which respects Express's 'trust proxy' setting
+ * When 'trust proxy' is configured, Express properly validates x-forwarded-for
+ * headers from trusted proxies only (e.g., Vercel's infrastructure)
  * @param {object} req - Express request object
  * @returns {string} IP address
  */
 function getClientIP(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.headers['x-real-ip'] ||
-    req.connection?.remoteAddress ||
-    req.socket?.remoteAddress ||
-    req.ip ||
-    'unknown'
-  );
+  // SECURITY: Use req.ip which respects 'trust proxy' setting
+  // This prevents IP spoofing via x-forwarded-for from untrusted sources
+  // The 'trust proxy' setting must be configured in server.js
+  return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
 /**

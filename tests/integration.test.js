@@ -186,36 +186,38 @@ async function runRateLimitTests() {
   const { createRateLimitMiddleware, getClientIP } = require('../middleware/rateLimit');
   const usage = require('../services/usage');
 
-  console.log('getClientIP:');
+  console.log('getClientIP (Secure Implementation):');
 
-  await test('extracts IP from x-forwarded-for header', async () => {
+  // SECURITY: getClientIP now uses req.ip (Express's built-in that respects 'trust proxy')
+  // instead of directly reading headers which is vulnerable to IP spoofing
+
+  await test('uses req.ip when available (Express sets this)', async () => {
     const req = {
-      headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' },
-      connection: {},
+      ip: '1.2.3.4',  // Express sets this based on trust proxy
+      headers: { 'x-forwarded-for': '5.6.7.8' }, // Should be ignored
       socket: {}
     };
     const ip = getClientIP(req);
-    assertEqual(ip, '1.2.3.4', 'Should extract first IP from x-forwarded-for');
+    assertEqual(ip, '1.2.3.4', 'Should use req.ip (Express handles trust proxy)');
   });
 
-  await test('extracts IP from x-real-ip header', async () => {
+  await test('ignores x-forwarded-for header directly (security)', async () => {
     const req = {
-      headers: { 'x-real-ip': '10.0.0.1' },
-      connection: {},
+      headers: { 'x-forwarded-for': '10.0.0.1' },
+      // No ip or socket.remoteAddress - only untrusted header
       socket: {}
     };
     const ip = getClientIP(req);
-    assertEqual(ip, '10.0.0.1', 'Should use x-real-ip');
+    assertEqual(ip, 'unknown', 'Should NOT read x-forwarded-for directly');
   });
 
-  await test('falls back to connection.remoteAddress', async () => {
+  await test('falls back to socket.remoteAddress when req.ip not set', async () => {
     const req = {
       headers: {},
-      connection: { remoteAddress: '192.168.1.1' },
-      socket: {}
+      socket: { remoteAddress: '192.168.1.1' }
     };
     const ip = getClientIP(req);
-    assertEqual(ip, '192.168.1.1', 'Should use connection.remoteAddress');
+    assertEqual(ip, '192.168.1.1', 'Should use socket.remoteAddress as fallback');
   });
 
   await test('returns unknown when no IP available', async () => {
@@ -266,8 +268,8 @@ async function runRateLimitTests() {
     usage.incrementUsage(null, null, 'rate-test-ip-2');
 
     const req = {
-      headers: { 'x-forwarded-for': 'rate-test-ip-2' },
-      connection: {},
+      ip: 'rate-test-ip-2',  // Use ip (Express sets this)
+      headers: {},
       socket: {},
       user: null
     };
@@ -281,9 +283,9 @@ async function runRateLimitTests() {
 
     await middleware(req, res, () => { nextCalled = true; });
 
-    assertEqual(status, 402, 'Should return 402 Payment Required');
+    assertEqual(status, 429, 'Should return 429 Too Many Requests');
     assertFalse(nextCalled, 'next should not be called when at limit');
-    assertEqual(jsonData.code, 'LIMIT_REACHED', 'Should have LIMIT_REACHED code');
+    assertEqual(jsonData.code, 'RATE_LIMITED', 'Should have RATE_LIMITED code');
   });
 
   await test('allows paid user with high usage', async () => {
@@ -327,8 +329,8 @@ async function runRateLimitTests() {
     });
 
     const req = {
+      ip: 'free-user-ip',  // Use ip (Express sets this)
       headers: {},
-      connection: {},
       socket: {},
       user: { id: 'free-user-at-limit' }
     };
@@ -342,7 +344,7 @@ async function runRateLimitTests() {
 
     await middleware(req, res, () => { nextCalled = true; });
 
-    assertEqual(status, 402, 'Should return 402');
+    assertEqual(status, 429, 'Should return 429 Too Many Requests');
     assertFalse(nextCalled, 'next should not be called');
     assertEqual(jsonData.tier, 'free', 'Should be free tier');
   });

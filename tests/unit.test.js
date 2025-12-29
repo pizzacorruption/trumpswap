@@ -462,9 +462,13 @@ function runUsageTests() {
     usage.resetAnonymousUsage('increment-anon-ip');
     const result1 = usage.incrementUsage(null, null, 'increment-anon-ip');
     assertEqual(result1.newCount, 1, 'First increment should be 1');
+    assertTrue(result1.success, 'First increment should succeed');
 
+    // Second increment should FAIL because anonymous limit is 1
     const result2 = usage.incrementUsage(null, null, 'increment-anon-ip');
-    assertEqual(result2.newCount, 2, 'Second increment should be 2');
+    assertFalse(result2.success, 'Second increment should fail (limit reached)');
+    assertEqual(result2.newCount, 1, 'Count stays at 1 after failed increment');
+    assertEqual(result2.error, 'Usage limit exceeded', 'Should have limit exceeded error');
   });
 
   test('anonymous shouldUpdateDb is false', () => {
@@ -474,13 +478,24 @@ function runUsageTests() {
   });
 
   test('authenticated user shouldUpdateDb is true', () => {
-    const result = usage.incrementUsage('user-auth', { generation_count: 5 }, null);
+    // Use generation_count under free tier limit (3) so increment succeeds
+    const result = usage.incrementUsage('user-auth', { generation_count: 1 }, null);
+    assertTrue(result.success, 'Increment should succeed when under limit');
     assertTrue(result.shouldUpdateDb, 'Should update DB for authenticated user');
   });
 
   test('authenticated user gets correct newCount', () => {
-    const result = usage.incrementUsage('user-auth', { generation_count: 7 }, null);
-    assertEqual(result.newCount, 8, 'newCount should be 8 (7 + 1)');
+    // Use generation_count under free tier limit (3) so increment succeeds
+    const result = usage.incrementUsage('user-auth', { generation_count: 2 }, null);
+    assertTrue(result.success, 'Increment should succeed when under limit');
+    assertEqual(result.newCount, 3, 'newCount should be 3 (2 + 1)');
+  });
+
+  test('authenticated user at limit cannot increment', () => {
+    // At free tier limit (3), increment should fail
+    const result = usage.incrementUsage('user-auth', { generation_count: 3 }, null);
+    assertFalse(result.success, 'Increment should fail at limit');
+    assertEqual(result.error, 'Usage limit exceeded', 'Should have limit exceeded error');
   });
 
   test('handles null profile for authenticated user', () => {
@@ -494,15 +509,17 @@ function runUsageTests() {
   console.log('\nresetAnonymousUsage:');
 
   test('resets usage for IP', () => {
-    usage.incrementUsage(null, null, 'reset-test-ip');
-    usage.incrementUsage(null, null, 'reset-test-ip');
+    // Use a unique IP to avoid collision with other tests
+    const testIp = 'reset-test-ip-' + Date.now();
+    usage.incrementUsage(null, null, testIp);
+    // Second increment fails (limit 1), but count stays at 1
 
-    let check = usage.checkUsage(null, null, 'reset-test-ip');
-    assertEqual(check.used, 2, 'Should have 2 before reset');
+    let check = usage.checkUsage(null, null, testIp);
+    assertEqual(check.used, 1, 'Should have 1 before reset (limit prevents 2)');
 
-    usage.resetAnonymousUsage('reset-test-ip');
+    usage.resetAnonymousUsage(testIp);
 
-    check = usage.checkUsage(null, null, 'reset-test-ip');
+    check = usage.checkUsage(null, null, testIp);
     assertEqual(check.used, 0, 'Should have 0 after reset');
   });
 

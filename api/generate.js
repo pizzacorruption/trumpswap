@@ -18,48 +18,55 @@ module.exports.config = config;
  * Add watermark to image buffer - visible but not obnoxious
  */
 async function addWatermark(inputBuffer, watermarkText = 'pimpmyepstein.lol') {
-  const metadata = await sharp(inputBuffer).metadata();
-  const { width, height } = metadata;
+  try {
+    const metadata = await sharp(inputBuffer).metadata();
+    const { width, height } = metadata;
 
-  const fontSize = Math.floor(Math.min(width, height) / 18);
-  const smallFontSize = Math.floor(fontSize * 0.7);
+    const fontSize = Math.floor(Math.min(width, height) / 18);
+    const smallFontSize = Math.floor(fontSize * 0.7);
 
-  const svgText = `
-    <svg width="${width}" height="${height}">
-      <defs>
-        <!-- Diagonal repeating pattern -->
-        <pattern id="watermarkPattern" width="${width * 0.45}" height="${height * 0.25}" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
-          <text x="0" y="${smallFontSize}" font-size="${smallFontSize}px" font-family="Arial, sans-serif" font-weight="600" fill="rgba(255,255,255,0.15)">${watermarkText}</text>
-        </pattern>
-      </defs>
+    // Calculate diagonal pattern spacing (no patternTransform - libvips doesn't support it)
+    const patternWidth = Math.floor(width * 0.4);
+    const patternHeight = Math.floor(height * 0.2);
 
-      <!-- Background pattern covering entire image -->
-      <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
+    // SVG without unsupported features (no drop-shadow filter, no patternTransform)
+    // libvips has limited SVG support - keep it simple
+    const svgText = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="watermarkPattern" width="${patternWidth}" height="${patternHeight}" patternUnits="userSpaceOnUse">
+            <text x="10" y="${smallFontSize + 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
+            <text x="${patternWidth / 2}" y="${patternHeight - 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
+        <text x="50%" y="48%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(0,0,0,0.3)">${watermarkText}</text>
+        <text x="50%" y="50%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(255,255,255,0.4)">${watermarkText}</text>
+      </svg>
+    `;
 
-      <!-- Center watermark with subtle shadow -->
-      <text
-        x="50%"
-        y="50%"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-size="${fontSize}px"
-        font-family="Arial, sans-serif"
-        font-weight="bold"
-        fill="rgba(255,255,255,0.35)"
-        filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.5))"
-      >${watermarkText}</text>
-    </svg>
-  `;
+    // Convert SVG to PNG buffer first (Sharp handles SVG better this way)
+    const svgBuffer = Buffer.from(svgText);
+    const watermarkPng = await sharp(svgBuffer, { density: 150 })
+      .resize(width, height, { fit: 'fill' })
+      .png()
+      .toBuffer();
 
-  const watermarkedBuffer = await sharp(inputBuffer)
-    .composite([{
-      input: Buffer.from(svgText),
-      gravity: 'center'
-    }])
-    .png()
-    .toBuffer();
+    // Composite the watermark PNG over the original image
+    const watermarkedBuffer = await sharp(inputBuffer)
+      .composite([{
+        input: watermarkPng,
+        blend: 'over'
+      }])
+      .png()
+      .toBuffer();
 
-  return watermarkedBuffer;
+    return watermarkedBuffer;
+  } catch (watermarkError) {
+    console.error('Watermark application failed:', watermarkError.message);
+    // Return original image if watermarking fails rather than crashing
+    return inputBuffer;
+  }
 }
 
 /**
@@ -113,19 +120,47 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Epstein photo selection is required' });
     }
 
+    // SECURITY: Validate epsteinPhoto path to prevent path traversal attacks
+    // 1. Strip leading slash first (UI sends paths like "/epstein-photos/file.jpg")
+    const sanitizedPhoto = epsteinPhoto.replace(/^\/+/, '');
+
+    // 2. Reject any path containing ".." or absolute paths (after stripping leading slash)
+    if (sanitizedPhoto.includes('..') || path.isAbsolute(sanitizedPhoto)) {
+      return res.status(400).json({ error: 'Invalid photo path' });
+    }
+
+    // 3. Build allowed base directory and resolve the requested path
+    const publicDir = path.join(process.cwd(), 'public');
+    const epsteinPhotosDir = path.join(publicDir, 'epstein-photos');
+    const epsteinPhotoPath = path.resolve(publicDir, sanitizedPhoto);
+
+    // 4. Verify resolved path is within the epstein-photos directory (not just public)
+    if (!epsteinPhotoPath.startsWith(epsteinPhotosDir + path.sep)) {
+      return res.status(400).json({ error: 'Invalid photo path' });
+    }
+
+    // 5. Whitelist check: verify the filename exists in the allowed photos directory
+    const requestedFilename = path.basename(epsteinPhotoPath);
+    const allowedPhotos = fs.existsSync(epsteinPhotosDir)
+      ? fs.readdirSync(epsteinPhotosDir).filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+      : [];
+    if (!allowedPhotos.includes(requestedFilename)) {
+      return res.status(400).json({ error: 'Selected Epstein photo not found' });
+    }
+
     // Read user photo buffer
     const userPhotoBuffer = fs.readFileSync(userPhotoFile.filepath);
     const userPhotoMime = userPhotoFile.mimetype;
 
-    // Read the Epstein photo from public folder
-    // In Vercel, static files are available at process.cwd()
-    const epsteinPhotoPath = path.join(process.cwd(), 'public', epsteinPhoto);
+    // Read the Epstein photo (path already validated above)
     if (!fs.existsSync(epsteinPhotoPath)) {
       return res.status(400).json({ error: 'Selected Epstein photo not found' });
     }
 
     const epsteinPhotoBuffer = fs.readFileSync(epsteinPhotoPath);
-    const epsteinPhotoMime = epsteinPhoto.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const epsteinPhotoExt = path.extname(epsteinPhotoPath).toLowerCase();
+    const epsteinPhotoMime = epsteinPhotoExt === '.png' ? 'image/png' :
+                             epsteinPhotoExt === '.webp' ? 'image/webp' : 'image/jpeg';
 
     console.log(`Generating Epstein swap... Epstein photo: ${epsteinPhoto}`);
 
