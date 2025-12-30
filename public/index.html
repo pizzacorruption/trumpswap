@@ -3800,9 +3800,10 @@
           sessionStorage.setItem('lastViewToken', lastViewToken);
         }
 
-        // Append viewToken to URL for anonymous users to access their images
+        // Set image source
+        // Note: data URLs (base64) don't support query params, only append viewToken to http URLs
         let imageUrl = data.imageUrl;
-        if (data.viewToken) {
+        if (data.viewToken && imageUrl && !imageUrl.startsWith('data:')) {
           imageUrl += `?viewToken=${data.viewToken}`;
         }
         resultImage.src = imageUrl;
