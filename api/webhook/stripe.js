@@ -10,6 +10,7 @@
 
 const Stripe = require('stripe');
 const { createAdminClient } = require('../../lib/supabase');
+const { getNextResetDate } = require('../../services/usage');
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -67,6 +68,68 @@ async function updateUserProfile(userId, updates) {
 }
 
 /**
+ * Add credits to a user's balance using atomic SQL increment
+ * SECURITY: Uses atomic increment to prevent race conditions
+ * @param {string} userId - User ID
+ * @param {number} creditsToAdd - Number of credits to add
+ * @param {string} customerId - Stripe customer ID
+ */
+async function addCreditsToUser(userId, creditsToAdd, customerId) {
+  const supabaseAdmin = createAdminClient();
+
+  if (!supabaseAdmin) {
+    console.error('Supabase admin client not configured - cannot update credit balance');
+    return { error: new Error('Supabase admin client not configured') };
+  }
+
+  // Use atomic SQL increment to prevent race conditions
+  const { data, error } = await supabaseAdmin.rpc('increment_credits', {
+    user_id: userId,
+    credits_to_add: creditsToAdd,
+    customer_id: customerId || null
+  });
+
+  if (error) {
+    // Fallback to non-atomic update if RPC not available
+    console.warn('RPC not available, using fallback update:', error.message);
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('credit_balance')
+      .eq('id', userId)
+      .single();
+
+    const currentCredits = profile?.credit_balance || 0;
+    const newCredits = currentCredits + creditsToAdd;
+
+    const updateData = {
+      credit_balance: newCredits,
+      updated_at: new Date().toISOString()
+    };
+
+    if (customerId) {
+      updateData.stripe_customer_id = customerId;
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error(`Failed to update credit balance for user ${userId}:`, updateError.message);
+      return { error: updateError };
+    }
+
+    console.log(`Added ${creditsToAdd} credits to user ${userId}. New balance: ${newCredits}`);
+    return { data: { credit_balance: newCredits } };
+  }
+
+  console.log(`Added ${creditsToAdd} credits to user ${userId} (atomic). New balance: ${data}`);
+  return { data: { credit_balance: data } };
+}
+
+/**
  * Find user by Stripe customer ID
  * Uses admin client to bypass RLS
  * @param {string} customerId - Stripe customer ID
@@ -96,19 +159,59 @@ async function findUserByCustomerId(customerId) {
  * New subscription created successfully
  */
 async function handleCheckoutCompleted(session) {
-  const userId = session.metadata?.userId;
+  let userId = session.metadata?.userId;
   const customerId = session.customer;
   const subscriptionId = session.subscription;
+  const sessionMode = session.mode;
+  const metadataType = session.metadata?.type;
+  const checkoutType = metadataType || (sessionMode === 'payment' ? 'credit' : 'subscription');
+
+  if (checkoutType === 'credit') {
+    if (!userId && customerId) {
+      const { user } = await findUserByCustomerId(customerId);
+      userId = user?.id;
+    }
+
+    if (!userId) {
+      console.warn('checkout.session.completed (credit): Could not identify user');
+      return { success: false, message: 'No userId for credit purchase' };
+    }
+
+    const quantity = parseInt(session.metadata?.quantity || '1', 10);
+    const creditsToAdd = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+
+    const { error } = await addCreditsToUser(userId, creditsToAdd, customerId);
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return {
+      success: true,
+      message: `${creditsToAdd} credit(s) added`,
+      creditsAdded: creditsToAdd,
+      userId
+    };
+  }
+
+  if (!userId && customerId) {
+    const { user } = await findUserByCustomerId(customerId);
+    userId = user?.id;
+  }
 
   if (!userId) {
     console.warn('checkout.session.completed: No userId in metadata');
     return { success: false, message: 'No userId in session metadata' };
   }
 
+  const monthlyResetAt = getNextResetDate().toISOString();
+
   const { error } = await updateUserProfile(userId, {
-    tier: 'paid',
+    tier: 'base',
     stripe_customer_id: customerId,
     stripe_subscription_id: subscriptionId,
+    monthly_generation_count: 0,
+    monthly_reset_at: monthlyResetAt,
     updated_at: new Date().toISOString()
   });
 
@@ -138,13 +241,13 @@ async function handleSubscriptionUpdated(subscription) {
     return { success: false, message: 'Could not identify user' };
   }
 
-  // Map Stripe subscription status to tier ('paid' or 'free')
-  // Active/trialing subscriptions get 'paid' tier, everything else is 'free'
+  // Map Stripe subscription status to tier ('base' or 'free')
+  // Active/trialing subscriptions get 'base' tier, everything else is 'free'
   let tier;
   switch (subscription.status) {
     case 'active':
     case 'trialing':
-      tier = 'paid';
+      tier = 'base';
       break;
     case 'past_due':
     case 'canceled':

@@ -222,7 +222,7 @@ function createPaidProfile(userId, overrides = {}) {
  */
 function createLimitedProfile(userId, overrides = {}) {
   return createTestProfile(userId, {
-    generation_count: 3, // Free tier limit
+    generation_count: 1, // Free tier limit
     ...overrides,
   });
 }

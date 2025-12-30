@@ -69,14 +69,14 @@ async function authenticateRequest(req) {
 }
 
 /**
- * POST /api/create-checkout
- * Creates a Stripe checkout session for $14.99/mo Base subscription
+ * POST /api/buy-credits
+ * Creates a Stripe checkout session for credit purchase ($3/credit)
  *
  * REQUIRES AUTHENTICATION
  * - Must provide valid JWT in Authorization header
  * - userId and email are derived from the authenticated user token
  *
- * Body: {} (no body required - user info comes from token)
+ * Body: { quantity?: number }
  */
 module.exports = async function handler(req, res) {
   // Set CORS headers (restricted to allowed origins)
@@ -102,11 +102,9 @@ module.exports = async function handler(req, res) {
     }
 
     // Derive userId and email from the authenticated user token
-    // This is more secure than requiring them in the request body
     const userId = user.id;
     const email = user.email;
 
-    // Validate that the user has an email (should always be present for authenticated users)
     if (!email) {
       return res.status(400).json({
         error: 'User email not available',
@@ -122,17 +120,22 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const { url, sessionId } = await stripeService.createCheckoutSession(userId, email);
+    const rawQuantity = parseInt(req.body?.quantity, 10);
+    const quantity = Math.min(Math.max(Number.isFinite(rawQuantity) ? rawQuantity : 1, 1), 100);
+
+    const { url, sessionId } = await stripeService.createCreditCheckoutSession(userId, email, quantity);
 
     res.json({
       success: true,
       checkoutUrl: url,
-      sessionId
+      sessionId,
+      quantity
     });
   } catch (error) {
-    console.error('Checkout creation error:', error.message);
+    console.error('Credit checkout creation error:', error.message);
     res.status(500).json({
-      error: 'Failed to create checkout session'
+      error: 'Failed to create credit checkout session',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

@@ -389,14 +389,14 @@ async function testConfigEndpoint() {
   );
 
   await test(
-    'Free tier has limit of 3',
-    'free.limit = 3',
+    'Free tier has limit of 1',
+    'free.limit = 1',
     async () => {
       const response = await fetch(`${BASE_URL}/api/config`);
       const data = await response.json();
       const freeTier = data.tiers.find(t => t.id === 'free');
-      assertEqual(freeTier.limit, 3, `Got limit: ${freeTier.limit}`);
-      return 'free tier limit is 3';
+      assertEqual(freeTier.limit, 1, `Got limit: ${freeTier.limit}`);
+      return 'free tier limit is 1';
     }
   );
 

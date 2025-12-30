@@ -392,13 +392,13 @@ async function runTierRateLimitTests() {
 
     assertTrue(next.wasCalled(), 'Should allow free user within limit');
     assertEqual(req.usage.tier, 'free', 'Should be free tier');
-    assertEqual(req.usage.limit, 3, 'Free limit should be 3');
-    assertEqual(req.usage.remaining, 2, 'Should have 2 remaining');
+    assertEqual(req.usage.limit, 1, 'Free limit should be 1');
+    assertEqual(req.usage.remaining, 1, 'Should have 1 remaining');
   });
 
   await test('free user blocked at limit', async () => {
     const middleware = createRateLimitMiddleware({
-      getProfile: async () => ({ generation_count: 3 })
+      getProfile: async () => ({ generation_count: 1 })
     });
     const req = createMockRequest({
       user: { id: 'free-limited-user' },
@@ -557,13 +557,13 @@ async function runRateLimitResponseTests() {
 
     await middleware(req, res, next);
 
-    assertEqual(res.jsonData.message, 'Sign up for free to get 3 more generations!',
+    assertEqual(res.jsonData.message, 'Sign up for free to track your creations!',
       'Should include anonymous upgrade message');
   });
 
   await test('429 response includes upgrade message for free user', async () => {
     const middleware = createRateLimitMiddleware({
-      getProfile: async () => ({ generation_count: 3 })
+      getProfile: async () => ({ generation_count: 1 })
     });
     const req = createMockRequest({
       user: { id: 'free-upgrade-user' },
@@ -574,7 +574,7 @@ async function runRateLimitResponseTests() {
 
     await middleware(req, res, next);
 
-    assertEqual(res.jsonData.message, 'Upgrade to Pro for unlimited generations!',
+    assertEqual(res.jsonData.message, 'Upgrade to Base for 100 watermark-free images/month!',
       'Should include free upgrade message');
   });
 }

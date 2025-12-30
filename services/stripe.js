@@ -1,16 +1,32 @@
 /**
  * Stripe Payment Service
- * Handles subscriptions for Pimp My Epstein Pro ($20/mo)
+ * Handles subscriptions and credit purchases for Pimp My Epstein
+ *
+ * Pricing Model:
+ * - Base subscription: $14.99/month for 100 watermark-free images
+ * - Credits: $3.00 per additional watermark-free image
  */
 
 const Stripe = require('stripe');
+const tiers = require('../config/tiers');
 
 // Initialize Stripe with secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // In-memory user store (replace with database in production)
-// Structure: { odtep: { odtepId, email, tier, stripe_customer_id, stripe_subscription_id } }
+// Structure: { userId: { userId, email, tier, stripe_customer_id, stripe_subscription_id, credit_balance } }
 const users = new Map();
+
+/**
+ * Calculate the next monthly reset date (1 month from now)
+ * @returns {Date}
+ */
+function getNextResetDate() {
+  const now = new Date();
+  const nextReset = new Date(now);
+  nextReset.setMonth(nextReset.getMonth() + 1);
+  return nextReset;
+}
 
 /**
  * Get or create a user profile
@@ -22,21 +38,26 @@ function getUser(userId) {
       email: null,
       tier: 'free',
       stripe_customer_id: null,
-      stripe_subscription_id: null
+      stripe_subscription_id: null,
+      credit_balance: 0,
+      monthly_generation_count: 0,
+      monthly_reset_at: null
     });
   }
   return users.get(userId);
 }
 
 /**
- * Create a Stripe Checkout session for $20/mo Pro subscription
+ * Create a Stripe Checkout session for Base subscription ($14.99/mo)
  * @param {string} userId - Internal user ID
  * @param {string} email - User's email address
  * @returns {Promise<{url: string, sessionId: string}>}
  */
 async function createCheckoutSession(userId, email) {
-  if (!process.env.STRIPE_PRICE_ID) {
-    throw new Error('STRIPE_PRICE_ID not configured');
+  // Use new price ID or fall back to legacy
+  const priceId = process.env.STRIPE_PRICE_BASE || process.env.STRIPE_PRICE_ID;
+  if (!priceId) {
+    throw new Error('STRIPE_PRICE_BASE not configured');
   }
 
   // Get or create user
@@ -63,7 +84,7 @@ async function createCheckoutSession(userId, email) {
     payment_method_types: ['card'],
     line_items: [
       {
-        price: process.env.STRIPE_PRICE_ID,
+        price: priceId,
         quantity: 1,
       },
     ],
@@ -71,7 +92,8 @@ async function createCheckoutSession(userId, email) {
     success_url: `${process.env.APP_URL || 'http://localhost:3000'}/upgrade.html?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/upgrade.html?canceled=true`,
     metadata: {
-      userId
+      userId,
+      type: 'subscription'
     },
     subscription_data: {
       metadata: {
@@ -87,6 +109,83 @@ async function createCheckoutSession(userId, email) {
 }
 
 /**
+ * Create a Stripe Checkout session for credit purchase ($3.00 per credit)
+ * @param {string} userId - Internal user ID
+ * @param {string} email - User's email address
+ * @param {number} quantity - Number of credits to purchase (default: 1)
+ * @returns {Promise<{url: string, sessionId: string}>}
+ */
+async function createCreditCheckoutSession(userId, email, quantity = 1) {
+  const priceId = process.env.STRIPE_PRICE_CREDIT;
+  if (!priceId) {
+    throw new Error('STRIPE_PRICE_CREDIT not configured');
+  }
+
+  // Get or create user
+  const user = getUser(userId);
+  user.email = email;
+
+  // Create or retrieve Stripe customer
+  let customerId = user.stripe_customer_id;
+
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email,
+      metadata: {
+        userId
+      }
+    });
+    customerId = customer.id;
+    user.stripe_customer_id = customerId;
+  }
+
+  // Create checkout session for one-time credit purchase
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: quantity,
+      },
+    ],
+    mode: 'payment',  // One-time payment, not subscription
+    success_url: `${process.env.APP_URL || 'http://localhost:3000'}/upgrade.html?credits_purchased=${quantity}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/upgrade.html?canceled=true`,
+    metadata: {
+      userId,
+      type: 'credit',
+      quantity: quantity.toString()
+    }
+  });
+
+  return {
+    url: session.url,
+    sessionId: session.id
+  };
+}
+
+/**
+ * Create a Stripe Customer Portal session for subscription management
+ * @param {string} customerId - Stripe customer ID
+ * @returns {Promise<{url: string}>}
+ */
+async function createCustomerPortalSession(customerId) {
+  if (!customerId) {
+    throw new Error('Customer ID required');
+  }
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: `${process.env.APP_URL || 'http://localhost:3000'}/upgrade.html`,
+  });
+
+  return {
+    url: session.url
+  };
+}
+
+/**
  * Handle Stripe webhook events
  * @param {object} event - Stripe webhook event
  * @returns {Promise<{success: boolean, message: string}>}
@@ -97,24 +196,58 @@ async function handleWebhook(event) {
       const session = event.data.object;
       const userId = session.metadata?.userId;
       const customerId = session.customer;
+      const sessionMode = session.mode;
+      const metadataType = session.metadata?.type;
+      const checkoutType = metadataType || (sessionMode === 'payment' ? 'credit' : 'subscription');
+
+      // Handle credit purchases
+      if (checkoutType === 'credit') {
+        const quantity = parseInt(session.metadata?.quantity || '1', 10);
+
+        if (userId) {
+          const user = getUser(userId);
+          user.stripe_customer_id = customerId;
+          user.credit_balance = (user.credit_balance || 0) + quantity;
+
+          console.log(`Added ${quantity} credits to user ${userId}. New balance: ${user.credit_balance}`);
+        }
+
+        return {
+          success: true,
+          message: `${quantity} credit(s) added`,
+          userId,
+          creditsAdded: quantity,
+          stripe_customer_id: customerId,
+          checkoutType: 'credit'
+        };
+      }
+
+      // Handle subscription checkout
       const subscriptionId = session.subscription;
+      const monthlyResetAt = getNextResetDate().toISOString();
 
       if (userId) {
         const user = getUser(userId);
-        user.tier = 'paid';
+        user.tier = 'base';  // Use 'base' for new subscriptions
         user.stripe_customer_id = customerId;
         user.stripe_subscription_id = subscriptionId;
+        // Set monthly reset date
+        user.monthly_generation_count = 0;
+        user.monthly_reset_at = monthlyResetAt;
 
-        console.log(`Upgraded user ${userId} to paid tier`);
+        console.log(`Upgraded user ${userId} to base tier`);
       }
 
       return {
         success: true,
         message: 'Subscription activated',
         userId,
-        tier: 'paid',
+        tier: 'base',
         stripe_customer_id: customerId,
-        stripe_subscription_id: subscriptionId
+        stripe_subscription_id: subscriptionId,
+        monthly_generation_count: 0,
+        monthly_reset_at: monthlyResetAt,
+        checkoutType: 'subscription'
       };
     }
 
@@ -128,8 +261,8 @@ async function handleWebhook(event) {
 
         // Check subscription status
         if (subscription.status === 'active') {
-          user.tier = 'paid';
-          tier = 'paid';
+          user.tier = 'base';
+          tier = 'base';
         } else if (['canceled', 'unpaid', 'past_due'].includes(subscription.status)) {
           user.tier = 'free';
           tier = 'free';
@@ -146,6 +279,29 @@ async function handleWebhook(event) {
         stripe_customer_id: subscription.customer,
         stripe_subscription_id: subscription.id
       };
+    }
+
+    // Handle invoice.paid for subscription renewal - reset monthly count
+    case 'invoice.paid': {
+      const invoice = event.data.object;
+      const customerId = invoice.customer;
+      const subscriptionId = invoice.subscription;
+
+      // Only process subscription renewals (not the initial payment)
+      if (subscriptionId && invoice.billing_reason === 'subscription_cycle') {
+        // Find user by customer ID
+        for (const [userId, user] of users.entries()) {
+          if (user.stripe_customer_id === customerId) {
+            // Reset monthly count on renewal
+            user.monthly_generation_count = 0;
+            user.monthly_reset_at = getNextResetDate().toISOString();
+            console.log(`Reset monthly count for user ${userId} on subscription renewal`);
+            break;
+          }
+        }
+      }
+
+      return { success: true, message: 'Invoice paid processed' };
     }
 
     case 'customer.subscription.deleted': {
@@ -314,12 +470,63 @@ async function getUserIdForCustomer(customerId) {
   }
 }
 
+/**
+ * Verify a completed checkout session and return the details
+ * Used as fallback when webhooks don't work (e.g., local development)
+ * @param {string} sessionId - Stripe checkout session ID
+ * @returns {Promise<object>} Session details including payment status
+ */
+async function verifyCheckoutSession(sessionId) {
+  if (!sessionId) {
+    throw new Error('Session ID required');
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ['subscription', 'customer']
+  });
+
+  if (session.payment_status !== 'paid') {
+    return {
+      success: false,
+      message: 'Payment not completed',
+      status: session.payment_status
+    };
+  }
+
+  const userId = session.metadata?.userId;
+  const checkoutType = session.metadata?.type || (session.mode === 'payment' ? 'credit' : 'subscription');
+
+  if (checkoutType === 'credit') {
+    const quantity = parseInt(session.metadata?.quantity || '1', 10);
+    return {
+      success: true,
+      type: 'credit',
+      userId,
+      customerId: session.customer?.id || session.customer,
+      creditsAdded: quantity
+    };
+  }
+
+  // Subscription checkout
+  return {
+    success: true,
+    type: 'subscription',
+    userId,
+    customerId: session.customer?.id || session.customer,
+    subscriptionId: session.subscription?.id || session.subscription,
+    tier: 'base'
+  };
+}
+
 module.exports = {
   createCheckoutSession,
+  createCreditCheckoutSession,
+  createCustomerPortalSession,
   handleWebhook,
   cancelSubscription,
   getSubscriptionStatus,
   constructWebhookEvent,
   getUserIdForCustomer,
-  getUser
+  getUser,
+  verifyCheckoutSession
 };

@@ -320,7 +320,7 @@ async function runRateLimitTests() {
     clearMockProfiles();
     mockProfiles.set('free-user-at-limit', {
       subscription_status: null,
-      generation_count: 3
+      generation_count: 1
     });
 
     const middleware = createRateLimitMiddleware({
@@ -353,7 +353,7 @@ async function runRateLimitTests() {
     clearMockProfiles();
     mockProfiles.set('free-upgrade-test', {
       subscription_status: null,
-      generation_count: 3
+      generation_count: 1
     });
 
     const middleware = createRateLimitMiddleware({
@@ -482,7 +482,7 @@ async function runFullFlowTests() {
     // Start as free user at limit
     mockProfiles.set('upgrade-user', {
       subscription_status: null,
-      generation_count: 3
+      generation_count: 1
     });
 
     let usageInfo = usage.checkUsage('upgrade-user', mockProfiles.get('upgrade-user'), null);
@@ -491,7 +491,7 @@ async function runFullFlowTests() {
     // Upgrade to paid
     mockProfiles.set('upgrade-user', {
       subscription_status: 'active',
-      generation_count: 3
+      generation_count: 1
     });
 
     usageInfo = usage.checkUsage('upgrade-user', mockProfiles.get('upgrade-user'), null);
@@ -516,7 +516,7 @@ async function runFullFlowTests() {
 
     usageInfo = usage.checkUsage('new-free-user', mockProfiles.get('new-free-user'), null);
     assertTrue(usageInfo.canGenerate, 'Free user can generate');
-    assertEqual(usageInfo.limit, 3, 'Free limit is 3');
+    assertEqual(usageInfo.limit, 1, 'Free limit is 1');
   });
 }
 
@@ -621,7 +621,7 @@ async function runEdgeCaseTests() {
     clearMockProfiles();
     mockProfiles.set('boundary-user', {
       subscription_status: null,
-      generation_count: 2 // limit is 3
+      generation_count: 0 // limit is 1, so 0 is under limit
     });
 
     const usageInfo = usage.checkUsage('boundary-user', mockProfiles.get('boundary-user'), null);

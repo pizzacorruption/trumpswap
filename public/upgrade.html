@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade to Pimp My Epstein Pro</title>
+  <title>Upgrade - Pimp My Epstein</title>
   <style>
     * {
       box-sizing: border-box;
@@ -19,12 +19,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 20px;
     }
 
     .container {
-      max-width: 500px;
+      max-width: 800px;
       width: 100%;
-      padding: 40px 20px;
       text-align: center;
     }
 
@@ -69,48 +69,89 @@
       margin-bottom: 32px;
     }
 
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
     .card {
       background: rgba(26, 26, 46, 0.8);
       backdrop-filter: blur(8px);
       border-radius: 20px;
-      padding: 32px;
+      padding: 28px;
       border: 1px solid rgba(255, 255, 255, 0.1);
-      margin-bottom: 24px;
+      text-align: left;
+      transition: all 0.3s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(239, 68, 68, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .card.featured {
+      border-color: #ef4444;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(26, 26, 46, 0.8));
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .badge {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 600;
     }
 
     .price {
-      font-size: 3.5rem;
+      font-size: 2.5rem;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .price span {
-      font-size: 1.2rem;
+      font-size: 1rem;
       font-weight: 400;
       color: #a1a1aa;
     }
 
+    .price-description {
+      color: #71717a;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
     .features {
       list-style: none;
-      margin: 24px 0;
-      text-align: left;
+      margin-bottom: 24px;
     }
 
     .features li {
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 0;
       display: flex;
       align-items: center;
-      gap: 12px;
-    }
-
-    .features li:last-child {
-      border-bottom: none;
+      gap: 10px;
+      color: #d4d4d8;
+      font-size: 0.95rem;
     }
 
     .check {
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       background: linear-gradient(135deg, #22c55e, #16a34a);
       border-radius: 50%;
       display: flex;
@@ -120,102 +161,106 @@
     }
 
     .check svg {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       stroke: white;
     }
 
-    .form-group {
-      margin-bottom: 16px;
-      text-align: left;
-    }
-
-    .form-group label {
-      display: block;
-      color: #a1a1aa;
-      font-size: 0.9rem;
-      margin-bottom: 8px;
-    }
-
-    .form-group input {
+    .btn {
       width: 100%;
-      padding: 14px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      color: #fff;
+      padding: 14px;
       font-size: 1rem;
-      transition: all 0.3s ease;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: #ef4444;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .form-group input::placeholder {
-      color: #52525b;
-    }
-
-    .btn-upgrade {
-      width: 100%;
-      padding: 16px;
-      font-size: 1.1rem;
       font-weight: 600;
       border: none;
       border-radius: 12px;
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
       background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: #fff;
-      position: relative;
-      overflow: hidden;
     }
 
-    .btn-upgrade:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4);
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-    .btn-upgrade:disabled {
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+    }
+
+    .btn:disabled {
       opacity: 0.6;
       cursor: not-allowed;
       transform: none;
     }
 
-    .btn-upgrade.loading {
-      pointer-events: none;
-    }
-
-    .btn-upgrade .spinner {
+    .btn .spinner {
       display: none;
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       border: 2px solid rgba(255, 255, 255, 0.3);
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin-right: 8px;
     }
 
-    .btn-upgrade.loading .spinner {
-      display: inline-block;
+    .btn.loading .spinner {
+      display: block;
+    }
+
+    .btn.loading .btn-text {
+      display: none;
     }
 
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
 
-    .back-link {
-      color: #71717a;
-      text-decoration: none;
-      font-size: 0.95rem;
-      transition: color 0.2s ease;
+    .quantity-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
-    .back-link:hover {
+    .quantity-selector label {
+      color: #a1a1aa;
+      font-size: 0.9rem;
+    }
+
+    .quantity-selector input {
+      width: 70px;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
       color: #fff;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .quantity-selector input:focus {
+      outline: none;
+      border-color: #ef4444;
+    }
+
+    .credit-total {
+      color: #a1a1aa;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
     }
 
     .error {
@@ -225,7 +270,6 @@
       border-radius: 10px;
       margin-bottom: 16px;
       display: none;
-      text-align: left;
     }
 
     .error.visible {
@@ -262,12 +306,23 @@
       border: 1px solid #fbbf24;
       padding: 12px 16px;
       border-radius: 10px;
-      margin-bottom: 16px;
+      margin-bottom: 24px;
       display: none;
     }
 
     .canceled-notice.visible {
       display: block;
+    }
+
+    .back-link {
+      color: #71717a;
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s ease;
+    }
+
+    .back-link:hover {
+      color: #fff;
     }
 
     .guarantee {
@@ -277,7 +332,7 @@
       gap: 8px;
       color: #71717a;
       font-size: 0.85rem;
-      margin-top: 16px;
+      margin-top: 24px;
     }
 
     .guarantee svg {
@@ -285,9 +340,46 @@
       height: 16px;
     }
 
-    @media (max-width: 640px) {
-      .container {
-        padding: 24px 16px;
+    .manage-subscription {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .manage-link {
+      color: #a1a1aa;
+      text-decoration: underline;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .manage-link:hover {
+      color: #fff;
+    }
+
+    .auth-required {
+      display: none;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .auth-required.visible {
+      display: block;
+    }
+
+    .auth-required h2 {
+      margin-bottom: 16px;
+    }
+
+    .auth-required p {
+      color: #a1a1aa;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 700px) {
+      .pricing-grid {
+        grid-template-columns: 1fr;
       }
 
       h1 {
@@ -295,17 +387,11 @@
       }
 
       .card {
-        padding: 24px 20px;
-        border-radius: 16px;
+        padding: 24px;
       }
 
       .price {
-        font-size: 2.8rem;
-      }
-
-      .btn-upgrade {
-        padding: 14px;
-        font-size: 1rem;
+        font-size: 2rem;
       }
     }
   </style>
@@ -315,81 +401,151 @@
     <!-- Success message (shown after successful payment) -->
     <div class="success-message" id="successMessage">
       <div class="logo fade-in-up">&#127881;</div>
-      <h2 class="fade-in-up delay-1">Welcome to Pro!</h2>
-      <p class="fade-in-up delay-2">Your subscription is now active. Enjoy unlimited swaps without watermarks!</p>
-      <a href="/" class="btn-upgrade fade-in-up delay-3">Start Swapping</a>
+      <h2 class="fade-in-up delay-1" id="successTitle">Welcome to Base!</h2>
+      <p class="fade-in-up delay-2" id="successText">Your subscription is now active. Enjoy 50 watermark-free images per month!</p>
+      <a href="/" class="btn btn-primary fade-in-up delay-3">Start Creating</a>
     </div>
 
-    <!-- Main upgrade form -->
-    <div id="upgradeForm">
+    <!-- Auth required message -->
+    <div class="auth-required" id="authRequired">
+      <div class="logo">&#128274;</div>
+      <h2>Sign In Required</h2>
+      <p>Please sign in to purchase a subscription or credits.</p>
+      <a href="/" class="btn btn-primary">Go to App</a>
+    </div>
+
+    <!-- Main pricing page -->
+    <div id="pricingPage">
       <div class="logo fade-in-up">&#127941;</div>
-      <h1 class="fade-in-up delay-1">Pimp My Epstein Pro</h1>
-      <p class="subtitle fade-in-up delay-2">Unlimited swaps, no watermarks</p>
+      <h1 class="fade-in-up delay-1">Pimp My Epstein</h1>
+      <p class="subtitle fade-in-up delay-2">Remove watermarks and create more images</p>
 
       <div class="canceled-notice" id="canceledNotice">
         Your checkout was canceled. Ready to try again?
       </div>
 
-      <div class="card fade-in-up delay-3">
-        <div class="price">$20<span>/month</span></div>
+      <div class="error" id="error"></div>
 
-        <ul class="features">
-          <li>
-            <div class="check">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <span>Unlimited face swaps</span>
-          </li>
-          <li>
-            <div class="check">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <span>No watermarks on images</span>
-          </li>
-          <li>
-            <div class="check">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <span>Priority processing</span>
-          </li>
-          <li>
-            <div class="check">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <span>Cancel anytime</span>
-          </li>
-        </ul>
+      <div class="pricing-grid fade-in-up delay-3">
+        <!-- Base Subscription -->
+        <div class="card featured">
+          <div class="card-header">
+            <span class="card-title">Base Plan</span>
+            <span class="badge">Best Value</span>
+          </div>
+          <div class="price">$14.99<span>/month</span></div>
+          <p class="price-description">50 watermark-free images per month</p>
 
-        <div class="error" id="error"></div>
+          <ul class="features">
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              50 watermark-free images/month
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              High-quality downloads
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Priority processing
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Cancel anytime
+            </li>
+          </ul>
 
-        <div class="form-group">
-          <label for="email">Email address</label>
-          <input type="email" id="email" placeholder="you@example.com" required>
+          <button class="btn btn-primary" id="subscribeBtn">
+            <span class="spinner"></span>
+            <span class="btn-text">Subscribe Now</span>
+          </button>
         </div>
 
-        <button class="btn-upgrade" id="upgradeBtn">
-          <span class="spinner"></span>
-          <span class="btn-text">Subscribe Now</span>
-        </button>
+        <!-- Credit Pack -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Credit Pack</span>
+          </div>
+          <div class="price">$3.00<span>/pack</span></div>
+          <p class="price-description">3 credits for watermark-free images</p>
 
-        <div class="guarantee">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span>Secure payment via Stripe</span>
+          <ul class="features">
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              3 watermark-free images ($1 each)
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Or remove watermark from existing
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Credits never expire
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Use anytime
+            </li>
+          </ul>
+
+          <div class="quantity-selector">
+            <label for="creditQty">Packs:</label>
+            <input type="number" id="creditQty" value="1" min="1" max="100">
+          </div>
+          <p class="credit-total" id="creditTotal">Total: $3.00 (3 credits)</p>
+
+          <button class="btn btn-secondary" id="buyCreditsBtn">
+            <span class="spinner"></span>
+            <span class="btn-text">Buy Credit Pack</span>
+          </button>
         </div>
       </div>
 
-      <a href="/" class="back-link fade-in-up delay-4">&#8592; Back to Pimp My Epstein</a>
+      <a href="/" class="back-link fade-in-up delay-4">&larr; Back to Pimp My Epstein</a>
+
+      <div class="guarantee fade-in-up delay-4">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>Secure payment via Stripe</span>
+      </div>
+
+      <div class="manage-subscription" id="manageSection" style="display: none;">
+        <span class="manage-link" id="manageLink">Manage your subscription</span>
+      </div>
     </div>
   </div>
 
@@ -397,39 +553,113 @@
     // Check URL params for success/cancel states
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
+    const creditsPurchased = urlParams.get('credits_purchased');
     const canceled = urlParams.get('canceled');
 
-    // Show success message if returning from successful checkout
-    if (sessionId) {
-      document.getElementById('upgradeForm').style.display = 'none';
-      document.getElementById('successMessage').classList.add('visible');
-    }
-
-    // Show canceled notice if checkout was canceled
-    if (canceled === 'true') {
-      document.getElementById('canceledNotice').classList.add('visible');
-    }
-
     // Elements
-    const emailInput = document.getElementById('email');
-    const upgradeBtn = document.getElementById('upgradeBtn');
+    const pricingPage = document.getElementById('pricingPage');
+    const successMessage = document.getElementById('successMessage');
+    const successTitle = document.getElementById('successTitle');
+    const successText = document.getElementById('successText');
+    const authRequired = document.getElementById('authRequired');
+    const canceledNotice = document.getElementById('canceledNotice');
     const errorDiv = document.getElementById('error');
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    const buyCreditsBtn = document.getElementById('buyCreditsBtn');
+    const creditQtyInput = document.getElementById('creditQty');
+    const creditTotalEl = document.getElementById('creditTotal');
+    const manageSection = document.getElementById('manageSection');
+    const manageLink = document.getElementById('manageLink');
 
-    // Generate or get user ID (simple anonymous ID for now)
-    function getUserId() {
-      let userId = localStorage.getItem('epsteinswap_user_id');
-      if (!userId) {
-        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('epsteinswap_user_id', userId);
+    // Get auth token from Supabase session
+    async function getAuthToken() {
+      // Try to get token from localStorage (Supabase v2 uses sb-{project_ref}-auth-token format)
+      const storageKey = Object.keys(localStorage).find(k =>
+        k.includes('supabase.auth') || k.startsWith('sb-') && k.endsWith('-auth-token')
+      );
+      if (storageKey) {
+        try {
+          const session = JSON.parse(localStorage.getItem(storageKey));
+          // Supabase v2 stores access_token directly, or nested in session object
+          return session?.access_token || session?.session?.access_token || null;
+        } catch (e) {
+          return null;
+        }
       }
-      return userId;
+      return null;
     }
 
-    // Validate email
-    function validateEmail(email) {
-      const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return regex.test(email);
+    // Check auth and show appropriate view
+    async function init() {
+      // Show success message if returning from successful checkout
+      if (sessionId) {
+        pricingPage.style.display = 'none';
+
+        // Verify the session and update profile (fallback for when webhooks don't work)
+        const token = await getAuthToken();
+        if (token) {
+          try {
+            const response = await fetch('/api/verify-session', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ sessionId })
+            });
+            const result = await response.json();
+            if (result.success) {
+              console.log('Session verified:', result);
+            }
+          } catch (err) {
+            console.warn('Could not verify session:', err);
+          }
+        }
+
+        if (creditsPurchased) {
+          successTitle.textContent = 'Credits Added!';
+          successText.textContent = `${creditsPurchased} credit(s) have been added to your account.`;
+        }
+
+        successMessage.classList.add('visible');
+        return;
+      }
+
+      // Show canceled notice if checkout was canceled
+      if (canceled === 'true') {
+        canceledNotice.classList.add('visible');
+      }
+
+      // Check if user is authenticated
+      const token = await getAuthToken();
+      if (!token) {
+        pricingPage.style.display = 'none';
+        authRequired.classList.add('visible');
+        return;
+      }
+
+      // Check if user has a subscription (show manage link)
+      try {
+        const response = await fetch('/api/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+
+        if (data.profile?.stripe_customer_id) {
+          manageSection.style.display = 'block';
+        }
+      } catch (e) {
+        // Ignore - just don't show manage link
+      }
     }
+
+    // Update credit total when quantity changes
+    creditQtyInput.addEventListener('input', () => {
+      const qty = Math.max(1, Math.min(100, parseInt(creditQtyInput.value) || 1));
+      creditTotalEl.textContent = `Total: $${(qty * 3).toFixed(2)} (${qty * 3} credits)`;
+    });
 
     // Show error
     function showError(message) {
@@ -442,47 +672,36 @@
       errorDiv.classList.remove('visible');
     }
 
-    // Set loading state
-    function setLoading(loading) {
+    // Set button loading state
+    function setLoading(btn, loading) {
       if (loading) {
-        upgradeBtn.classList.add('loading');
-        upgradeBtn.disabled = true;
+        btn.classList.add('loading');
+        btn.disabled = true;
       } else {
-        upgradeBtn.classList.remove('loading');
-        upgradeBtn.disabled = false;
+        btn.classList.remove('loading');
+        btn.disabled = false;
       }
     }
 
-    // Handle upgrade click
-    upgradeBtn.addEventListener('click', async () => {
+    // Subscribe button click
+    subscribeBtn.addEventListener('click', async () => {
       hideError();
+      const token = await getAuthToken();
 
-      const email = emailInput.value.trim();
-
-      if (!email) {
-        showError('Please enter your email address');
-        emailInput.focus();
+      if (!token) {
+        showError('Please sign in first');
         return;
       }
 
-      if (!validateEmail(email)) {
-        showError('Please enter a valid email address');
-        emailInput.focus();
-        return;
-      }
-
-      setLoading(true);
+      setLoading(subscribeBtn, true);
 
       try {
         const response = await fetch('/api/create-checkout', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            userId: getUserId(),
-            email: email
-          })
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
         });
 
         const data = await response.json();
@@ -492,36 +711,92 @@
         }
 
         if (data.checkoutUrl) {
-          // Redirect to Stripe Checkout
           window.location.href = data.checkoutUrl;
         } else {
           throw new Error('No checkout URL received');
         }
       } catch (error) {
-        setLoading(false);
+        setLoading(subscribeBtn, false);
         showError(error.message || 'Something went wrong. Please try again.');
       }
     });
 
-    // Allow Enter key to submit
-    emailInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        upgradeBtn.click();
+    // Buy credits button click
+    buyCreditsBtn.addEventListener('click', async () => {
+      hideError();
+      const token = await getAuthToken();
+
+      if (!token) {
+        showError('Please sign in first');
+        return;
+      }
+
+      const quantity = Math.max(1, Math.min(100, parseInt(creditQtyInput.value) || 1));
+      setLoading(buyCreditsBtn, true);
+
+      try {
+        const response = await fetch('/api/buy-credits', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ quantity })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error('No checkout URL received');
+        }
+      } catch (error) {
+        setLoading(buyCreditsBtn, false);
+        showError(error.message || 'Something went wrong. Please try again.');
       }
     });
 
-    // Pre-fill email if stored
-    const storedEmail = localStorage.getItem('epsteinswap_email');
-    if (storedEmail) {
-      emailInput.value = storedEmail;
-    }
+    // Manage subscription link click
+    manageLink.addEventListener('click', async () => {
+      const token = await getAuthToken();
 
-    // Save email on input
-    emailInput.addEventListener('blur', () => {
-      if (emailInput.value.trim()) {
-        localStorage.setItem('epsteinswap_email', emailInput.value.trim());
+      if (!token) {
+        showError('Please sign in first');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/customer-portal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        if (data.portalUrl) {
+          window.location.href = data.portalUrl;
+        } else {
+          throw new Error('No portal URL received');
+        }
+      } catch (error) {
+        showError(error.message || 'Failed to open subscription management.');
       }
     });
+
+    // Initialize
+    init();
   </script>
 </body>
 </html>

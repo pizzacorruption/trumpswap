@@ -374,133 +374,228 @@ function runUsageTests() {
   });
 
   // -------------------------------------------
-  // checkUsage Tests
+  // checkUsage Tests (Two-Tier System)
   // -------------------------------------------
   console.log('\ncheckUsage:');
 
-  test('anonymous user has limit of 1', () => {
+  test('anonymous user has total limit of 6 (5 quick + 1 premium)', () => {
     usage.resetAnonymousUsage('check-test-ip');
-    const result = usage.checkUsage(null, null, 'check-test-ip');
-    assertEqual(result.limit, 1, 'Anonymous limit should be 1');
+    const result = usage.checkUsage(null, null, 'check-test-ip', 'quick');
+    assertEqual(result.limit, 6, 'Anonymous total limit should be 6');
+    assertEqual(result.quickLimit, 5, 'Anonymous quick limit should be 5');
+    assertEqual(result.premiumLimit, 1, 'Anonymous premium limit should be 1');
   });
 
   test('anonymous user starts with 0 used', () => {
     usage.resetAnonymousUsage('fresh-ip');
-    const result = usage.checkUsage(null, null, 'fresh-ip');
+    const result = usage.checkUsage(null, null, 'fresh-ip', 'quick');
     assertEqual(result.used, 0, 'Should start with 0 used');
+    assertEqual(result.quickUsed, 0, 'Should start with 0 quick used');
+    assertEqual(result.premiumUsed, 0, 'Should start with 0 premium used');
   });
 
-  test('anonymous user canGenerate is true initially', () => {
+  test('anonymous user canGenerate is true initially for quick model', () => {
     usage.resetAnonymousUsage('can-gen-ip');
-    const result = usage.checkUsage(null, null, 'can-gen-ip');
-    assertTrue(result.canGenerate, 'Should be able to generate initially');
+    const result = usage.checkUsage(null, null, 'can-gen-ip', 'quick');
+    assertTrue(result.canGenerate, 'Should be able to generate quick initially');
   });
 
-  test('free user has limit of 3', () => {
-    const result = usage.checkUsage('user-free', { generation_count: 0 }, null);
-    assertEqual(result.limit, 3, 'Free limit should be 3');
+  test('anonymous user canGenerate is true initially for premium model', () => {
+    usage.resetAnonymousUsage('can-gen-premium-ip');
+    const result = usage.checkUsage(null, null, 'can-gen-premium-ip', 'premium');
+    assertTrue(result.canGenerate, 'Should be able to generate premium initially');
+  });
+
+  test('free user has limit of 6 (5 quick + 1 premium)', () => {
+    const result = usage.checkUsage('user-free', { generation_count: 0, quick_count: 0, premium_count: 0 }, null, 'quick');
+    assertEqual(result.limit, 6, 'Free total limit should be 6');
+    assertEqual(result.quickLimit, 5, 'Free quick limit should be 5');
+    assertEqual(result.premiumLimit, 1, 'Free premium limit should be 1');
+  });
+
+  test('base tier user has monthly limit of 50', () => {
+    const result = usage.checkUsage('user-base', { tier: 'base', monthly_generation_count: 0 }, null, 'quick');
+    assertEqual(result.monthlyLimit, 50, 'Base monthly limit should be 50');
   });
 
   test('paid user has unlimited limit', () => {
-    const result = usage.checkUsage('user-paid', { subscription_status: 'active' }, null);
+    const result = usage.checkUsage('user-paid', { subscription_status: 'active' }, null, 'quick');
     assertEqual(result.limit, 'unlimited', 'Paid limit should be unlimited');
   });
 
   test('returns correct tier name', () => {
-    const anonymous = usage.checkUsage(null, null, 'tier-name-ip');
+    const anonymous = usage.checkUsage(null, null, 'tier-name-ip', 'quick');
     assertEqual(anonymous.tierName, 'Anonymous', 'Should return Anonymous');
 
-    const free = usage.checkUsage('user-1', { generation_count: 0 }, null);
+    const free = usage.checkUsage('user-1', { generation_count: 0 }, null, 'quick');
     assertEqual(free.tierName, 'Free', 'Should return Free');
 
-    const paid = usage.checkUsage('user-2', { subscription_status: 'active' }, null);
-    assertEqual(paid.tierName, 'Pro', 'Should return Pro');
+    const paid = usage.checkUsage('user-2', { subscription_status: 'active' }, null, 'quick');
+    assertEqual(paid.tierName, 'Base', 'Should return Base');
   });
 
-  test('calculates remaining correctly', () => {
-    const result = usage.checkUsage('user-remaining', { generation_count: 1 }, null);
-    assertEqual(result.remaining, 2, 'Should have 2 remaining (3 - 1)');
+  test('calculates quick remaining correctly', () => {
+    const result = usage.checkUsage('user-remaining', { quick_count: 2, premium_count: 0 }, null, 'quick');
+    assertEqual(result.quickRemaining, 3, 'Should have 3 quick remaining (5 - 2)');
   });
 
-  test('remaining is 0 when at limit', () => {
-    const result = usage.checkUsage('user-at-limit', { generation_count: 3 }, null);
-    assertEqual(result.remaining, 0, 'Should have 0 remaining');
+  test('calculates premium remaining correctly', () => {
+    const result = usage.checkUsage('user-remaining', { quick_count: 0, premium_count: 0 }, null, 'premium');
+    assertEqual(result.premiumRemaining, 1, 'Should have 1 premium remaining (1 - 0)');
   });
 
-  test('canGenerate is false when at limit', () => {
-    const result = usage.checkUsage('user-at-limit', { generation_count: 3 }, null);
-    assertFalse(result.canGenerate, 'Should not be able to generate at limit');
+  test('canGenerate is false for quick when at quick limit', () => {
+    const result = usage.checkUsage('user-at-limit', { quick_count: 5, premium_count: 0 }, null, 'quick');
+    assertFalse(result.canGenerate, 'Should not be able to generate quick at limit');
   });
 
-  test('canGenerate is false when over limit', () => {
-    const result = usage.checkUsage('user-over', { generation_count: 10 }, null);
-    assertFalse(result.canGenerate, 'Should not be able to generate over limit');
+  test('canGenerate is false for premium when at premium limit', () => {
+    const result = usage.checkUsage('user-at-limit', { quick_count: 0, premium_count: 1 }, null, 'premium');
+    assertFalse(result.canGenerate, 'Should not be able to generate premium at limit');
   });
 
-  test('paid user canGenerate is always true', () => {
+  test('base tier user canGenerate when under monthly limit', () => {
+    const result = usage.checkUsage('user-base', {
+      tier: 'base',
+      monthly_generation_count: 25
+    }, null, 'quick');
+    assertTrue(result.canGenerate, 'Base tier should be able to generate under monthly limit');
+  });
+
+  test('base tier user cannot generate when at monthly limit', () => {
+    const result = usage.checkUsage('user-base', {
+      tier: 'base',
+      monthly_generation_count: 50,
+      credit_balance: 0
+    }, null, 'quick');
+    assertFalse(result.canGenerate, 'Base tier should not generate at monthly limit without credits');
+  });
+
+  test('paid user canGenerate with credits when over monthly limit', () => {
     const result = usage.checkUsage('user-paid', {
       subscription_status: 'active',
-      generation_count: 1000
-    }, null);
-    assertTrue(result.canGenerate, 'Paid user should always be able to generate');
+      monthly_generation_count: 50,
+      credit_balance: 5
+    }, null, 'quick');
+    assertTrue(result.canGenerate, 'Paid user should generate with credits over monthly limit');
   });
 
   test('paid user remaining is unlimited', () => {
     const result = usage.checkUsage('user-paid', {
       subscription_status: 'active',
       generation_count: 1000
-    }, null);
+    }, null, 'quick');
     assertEqual(result.remaining, 'unlimited', 'Paid remaining should be unlimited');
   });
 
+  test('checkUsage includes modelType in response', () => {
+    const result = usage.checkUsage('user-1', { generation_count: 0 }, null, 'premium');
+    assertEqual(result.modelType, 'premium', 'Should return modelType in response');
+  });
+
+  test('checkUsage includes credit info', () => {
+    const result = usage.checkUsage('user-1', { generation_count: 0, credit_balance: 10 }, null, 'quick');
+    assertEqual(result.credits, 10, 'Should return credit balance');
+  });
+
   // -------------------------------------------
-  // incrementUsage Tests
+  // incrementUsage Tests (Two-Tier System)
   // -------------------------------------------
   console.log('\nincrementUsage:');
 
-  test('increments anonymous usage in memory', () => {
+  test('increments anonymous quick usage in memory', () => {
     usage.resetAnonymousUsage('increment-anon-ip');
-    const result1 = usage.incrementUsage(null, null, 'increment-anon-ip');
-    assertEqual(result1.newCount, 1, 'First increment should be 1');
+    const result1 = usage.incrementUsage(null, null, 'increment-anon-ip', 'quick', false, 0);
+    assertEqual(result1.newQuickCount, 1, 'First quick increment should be 1');
+    assertEqual(result1.newPremiumCount, 0, 'Premium count should stay 0');
     assertTrue(result1.success, 'First increment should succeed');
+  });
 
-    // Second increment should FAIL because anonymous limit is 1
-    const result2 = usage.incrementUsage(null, null, 'increment-anon-ip');
-    assertFalse(result2.success, 'Second increment should fail (limit reached)');
-    assertEqual(result2.newCount, 1, 'Count stays at 1 after failed increment');
-    assertEqual(result2.error, 'Usage limit exceeded', 'Should have limit exceeded error');
+  test('increments anonymous premium usage in memory', () => {
+    usage.resetAnonymousUsage('increment-premium-ip');
+    const result1 = usage.incrementUsage(null, null, 'increment-premium-ip', 'premium', false, 0);
+    assertEqual(result1.newQuickCount, 0, 'Quick count should stay 0');
+    assertEqual(result1.newPremiumCount, 1, 'First premium increment should be 1');
+    assertTrue(result1.success, 'Premium increment should succeed');
+  });
+
+  test('anonymous user can use all 5 quick generations', () => {
+    usage.resetAnonymousUsage('five-quick-ip');
+    for (let i = 1; i <= 5; i++) {
+      const result = usage.incrementUsage(null, null, 'five-quick-ip', 'quick', false, 0);
+      assertTrue(result.success, `Quick increment ${i} should succeed`);
+      assertEqual(result.newQuickCount, i, `Quick count should be ${i}`);
+    }
   });
 
   test('anonymous shouldUpdateDb is false', () => {
     usage.resetAnonymousUsage('should-not-update-ip');
-    const result = usage.incrementUsage(null, null, 'should-not-update-ip');
+    const result = usage.incrementUsage(null, null, 'should-not-update-ip', 'quick', false, 0);
     assertFalse(result.shouldUpdateDb, 'Should not update DB for anonymous');
   });
 
   test('authenticated user shouldUpdateDb is true', () => {
-    // Use generation_count under free tier limit (3) so increment succeeds
-    const result = usage.incrementUsage('user-auth', { generation_count: 1 }, null);
+    const result = usage.incrementUsage('user-auth', { generation_count: 0, quick_count: 0 }, null, 'quick', false, 0);
     assertTrue(result.success, 'Increment should succeed when under limit');
     assertTrue(result.shouldUpdateDb, 'Should update DB for authenticated user');
   });
 
-  test('authenticated user gets correct newCount', () => {
-    // Use generation_count under free tier limit (3) so increment succeeds
-    const result = usage.incrementUsage('user-auth', { generation_count: 2 }, null);
+  test('authenticated user gets correct newCount for quick', () => {
+    const result = usage.incrementUsage('user-auth', { generation_count: 0, quick_count: 0 }, null, 'quick', false, 0);
     assertTrue(result.success, 'Increment should succeed when under limit');
-    assertEqual(result.newCount, 3, 'newCount should be 3 (2 + 1)');
+    assertEqual(result.newCount, 1, 'newCount should be 1 (0 + 1)');
+    assertEqual(result.newQuickCount, 1, 'newQuickCount should be 1');
   });
 
-  test('authenticated user at limit cannot increment', () => {
-    // At free tier limit (3), increment should fail
-    const result = usage.incrementUsage('user-auth', { generation_count: 3 }, null);
-    assertFalse(result.success, 'Increment should fail at limit');
-    assertEqual(result.error, 'Usage limit exceeded', 'Should have limit exceeded error');
+  test('authenticated user gets correct newCount for premium', () => {
+    const result = usage.incrementUsage('user-auth', { generation_count: 0, premium_count: 0 }, null, 'premium', false, 0);
+    assertTrue(result.success, 'Increment should succeed when under limit');
+    assertEqual(result.newCount, 1, 'newCount should be 1 (0 + 1)');
+    assertEqual(result.newPremiumCount, 1, 'newPremiumCount should be 1');
   });
 
   test('handles null profile for authenticated user', () => {
-    const result = usage.incrementUsage('user-no-profile', null, null);
+    const result = usage.incrementUsage('user-no-profile', null, null, 'quick', false, 0);
     assertEqual(result.newCount, 1, 'Should start from 0 with null profile');
+  });
+
+  test('base tier user increments monthly count', () => {
+    const result = usage.incrementUsage('user-base', {
+      tier: 'base',
+      generation_count: 10,
+      monthly_generation_count: 5
+    }, null, 'quick', false, 0);
+    assertTrue(result.success, 'Should succeed for base tier');
+    assertEqual(result.newMonthlyCount, 6, 'Monthly count should increment');
+  });
+
+  test('credit usage deducts from credit balance', () => {
+    const result = usage.incrementUsage('user-credits', {
+      generation_count: 10,
+      credit_balance: 5
+    }, null, 'quick', true, 1);
+    assertTrue(result.success, 'Should succeed with credits');
+    assertEqual(result.newCredits, 4, 'Credits should decrease by 1');
+    assertEqual(result.usedCredits, 1, 'Should track used credits');
+  });
+
+  test('premium credit usage deducts 2 credits', () => {
+    const result = usage.incrementUsage('user-credits', {
+      generation_count: 10,
+      credit_balance: 5
+    }, null, 'premium', true, 2);
+    assertTrue(result.success, 'Should succeed with credits');
+    assertEqual(result.newCredits, 3, 'Credits should decrease by 2');
+    assertEqual(result.usedCredits, 2, 'Should track used credits');
+  });
+
+  test('insufficient credits returns error', () => {
+    const result = usage.incrementUsage('user-low-credits', {
+      generation_count: 10,
+      credit_balance: 1
+    }, null, 'premium', true, 2);
+    assertFalse(result.success, 'Should fail with insufficient credits');
+    assertEqual(result.error, 'Insufficient credits', 'Should return insufficient credits error');
   });
 
   // -------------------------------------------
@@ -546,34 +641,78 @@ function runUsageTests() {
 // ============================================
 
 function runTiersTests() {
-  console.log('\n=== Tiers Configuration Tests ===\n');
+  console.log('\n=== Tiers Configuration Tests (Two-Tier System) ===\n');
   console.log('Tier definitions:');
 
   test('anonymous tier exists', () => {
     assertExists(tiers.anonymous, 'anonymous tier should exist');
   });
 
-  test('anonymous tier has limit of 1', () => {
-    assertEqual(tiers.anonymous.limit, 1, 'anonymous limit should be 1');
+  test('anonymous tier has total limit of 6', () => {
+    assertEqual(tiers.anonymous.limit, 6, 'anonymous limit should be 6');
+  });
+
+  test('anonymous tier has quickLimit of 5', () => {
+    assertEqual(tiers.anonymous.quickLimit, 5, 'anonymous quickLimit should be 5');
+  });
+
+  test('anonymous tier has premiumLimit of 1', () => {
+    assertEqual(tiers.anonymous.premiumLimit, 1, 'anonymous premiumLimit should be 1');
   });
 
   test('anonymous tier has name', () => {
     assertEqual(tiers.anonymous.name, 'Anonymous', 'anonymous name should be Anonymous');
   });
 
+  test('anonymous tier has watermark', () => {
+    assertFalse(tiers.anonymous.watermarkFree, 'anonymous should have watermark');
+  });
+
   test('free tier exists', () => {
     assertExists(tiers.free, 'free tier should exist');
   });
 
-  test('free tier has limit of 3', () => {
-    assertEqual(tiers.free.limit, 3, 'free limit should be 3');
+  test('free tier has total limit of 6', () => {
+    assertEqual(tiers.free.limit, 6, 'free limit should be 6');
+  });
+
+  test('free tier has quickLimit of 5', () => {
+    assertEqual(tiers.free.quickLimit, 5, 'free quickLimit should be 5');
+  });
+
+  test('free tier has premiumLimit of 1', () => {
+    assertEqual(tiers.free.premiumLimit, 1, 'free premiumLimit should be 1');
   });
 
   test('free tier has name', () => {
     assertEqual(tiers.free.name, 'Free', 'free name should be Free');
   });
 
-  test('paid tier exists', () => {
+  test('free tier can purchase credits', () => {
+    assertTrue(tiers.free.canPurchaseCredits, 'free should be able to purchase credits');
+  });
+
+  test('base tier exists', () => {
+    assertExists(tiers.base, 'base tier should exist');
+  });
+
+  test('base tier has unlimited limit', () => {
+    assertEqual(tiers.base.limit, Infinity, 'base limit should be Infinity');
+  });
+
+  test('base tier has monthlyLimit of 50', () => {
+    assertEqual(tiers.base.monthlyLimit, 50, 'base monthlyLimit should be 50');
+  });
+
+  test('base tier has name', () => {
+    assertEqual(tiers.base.name, 'Base', 'base name should be Base');
+  });
+
+  test('base tier is watermark-free', () => {
+    assertTrue(tiers.base.watermarkFree, 'base should be watermark-free');
+  });
+
+  test('paid tier exists (legacy)', () => {
     assertExists(tiers.paid, 'paid tier should exist');
   });
 
@@ -581,14 +720,37 @@ function runTiersTests() {
     assertEqual(tiers.paid.limit, Infinity, 'paid limit should be Infinity');
   });
 
+  test('paid tier has monthlyLimit of 50', () => {
+    assertEqual(tiers.paid.monthlyLimit, 50, 'paid monthlyLimit should be 50');
+  });
+
   test('paid tier has name', () => {
-    assertEqual(tiers.paid.name, 'Pro', 'paid name should be Pro');
+    assertEqual(tiers.paid.name, 'Base', 'paid name should be Base');
   });
 
   test('all tiers have descriptions', () => {
     assertExists(tiers.anonymous.description, 'anonymous should have description');
     assertExists(tiers.free.description, 'free should have description');
+    assertExists(tiers.base.description, 'base should have description');
     assertExists(tiers.paid.description, 'paid should have description');
+  });
+
+  test('credit config exists', () => {
+    assertExists(tiers.credit, 'credit config should exist');
+  });
+
+  test('credit quickCost is 1', () => {
+    assertEqual(tiers.credit.quickCost, 1, 'quick cost should be 1 credit');
+  });
+
+  test('credit premiumCost is 2', () => {
+    assertEqual(tiers.credit.premiumCost, 2, 'premium cost should be 2 credits');
+  });
+
+  test('models config exists', () => {
+    assertExists(tiers.models, 'models config should exist');
+    assertExists(tiers.models.quick, 'quick model should exist');
+    assertExists(tiers.models.premium, 'premium model should exist');
   });
 }
 

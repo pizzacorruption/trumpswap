@@ -689,8 +689,8 @@ async function testUpgradeButton() {
     assertEqual(response.status, 200, 'Upgrade page should return 200');
 
     const html = await response.text();
-    assertContains(html, '$20', 'Should show $20/month price');
-    assertContains(html, 'Pro', 'Should mention Pro tier');
+    assertContains(html, '$14.99', 'Should show $14.99/month price');
+    assertContains(html, 'Base', 'Should mention Base tier');
   });
 
   await test('Checkout endpoint requires authentication', async () => {
