@@ -61,29 +61,99 @@ Position the replacement person naturally within the aircraft cabin scene, maint
 Generate a photorealistic composite that looks like an authentic candid photograph taken during flight.`,
 
   // ============================================
-  // Woody Allen & Epstein - Heavy hooded coat
-  // Doorway/entrance setting
+  // Ghislaine Maxwell & Epstein at event
+  // 90s event, flash photography, military-style jacket
   // ============================================
-  'epstein_woodyallen_coat.png': `Create a new composite image by combining elements from both provided images.
+  'epstein_ghislain.jpg': `Create a new composite image by combining elements from both provided images.
 
-TASK: Replace Woody Allen (the person in the CENTER wearing a light gray hooded parka coat with the hood up and round glasses) with the person from the second image. Keep Jeffrey Epstein (the man on the RIGHT in the navy blue polo shirt and jeans) exactly as he appears. Keep the partially visible man on the left unchanged.
+TASK: Replace Ghislaine Maxwell (the woman on the RIGHT with short dark hair wearing a distinctive navy blue military-style jacket with gold fringe epaulettes and gold buttons, carrying a small red handbag) with the person from the second image. Keep Jeffrey Epstein (the man on the LEFT with gray hair wearing a dark navy button-down shirt tucked into light blue jeans with a brown leather belt) exactly as he appears.
 
 FACE PRESERVATION - CRITICAL:
 The replacement person's face must be kept 100% identical to the second image. Preserve every facial feature exactly: face shape, eye spacing, nose structure, jawline, skin tone, and all distinctive characteristics. Do not alter, age, smooth, or modify any facial features.
 
 CLOTHING TRANSFORMATION - IMPORTANT:
-Dress the replacement person in the SAME hooded parka coat as Woody Allen - a light gray/beige puffy winter jacket with the hood pulled up over their head. The coat should frame their face naturally. Keep their glasses if they have them, or add round glasses similar to Woody Allen's style. The person should have their hands in their pockets or at their sides in a similar relaxed pose.
+Dress the replacement person in the SAME distinctive navy blue military-style jacket that Ghislaine is wearing - it has gold/cream colored fringe epaulettes on the shoulders, gold decorative buttons down the front, and gold stripe trim on the collar and cuffs. Give them the same small red handbag held at their side. The outfit should look like authentic 1990s fashion.
 
 SETTING CONTEXT:
-This is at a doorway or building entrance with a red door visible on the left and stone/marble walls. The lighting is natural daylight, slightly overcast.
+This is at an indoor entertainment event (appears to be a movie premiere or party - "Clue" signage visible in background). There are people in the background including waitstaff in white shirts. The floor appears to be dark polished surface reflecting light.
 
 LIGHTING & STYLE:
-Match the soft, diffused natural daylight. The color temperature is neutral to slightly cool. Preserve the casual snapshot quality of the original photograph.
+This is classic 1990s event flash photography. Apply harsh direct flash lighting that creates bright faces with slight overexposure and darker shadowed backgrounds. The color temperature is warm with slight magenta/purple cast typical of 90s film stock. Add subtle film grain and the slightly compressed dynamic range of consumer flash photography from that era.
 
 COMPOSITION:
-Position the replacement person at the exact same location and scale as Woody Allen, with Epstein's arm around their shoulder in the same friendly pose. The body language should remain casual and comfortable.
+Position the replacement person at the exact same location and scale as Ghislaine, walking side-by-side with Epstein at a social event. Both should appear relaxed and smiling, as if casually strolling through the venue together. Maintain their body language as a comfortable couple arriving at an event.
 
-Generate a photorealistic composite that looks like an authentic candid photograph.`,
+Generate a photorealistic composite that looks like an authentic 1990s event photograph.`,
+
+  // ============================================
+  // Larry Summers & Epstein at social gathering
+  // Indoor event, candid group conversation
+  // ============================================
+  'epstein.summers.avif': `Create a new composite image by combining elements from both provided images.
+
+TASK: Replace Larry Summers (the balding man on the far RIGHT wearing a gray tweed blazer over a dark shirt) with the person from the second image. Keep Jeffrey Epstein (the man second from LEFT in the dark navy polo shirt with arms crossed, laughing) and all other people in the scene exactly as they appear.
+
+FACE PRESERVATION - CRITICAL:
+The replacement person's face must be kept 100% identical to the second image. Preserve every facial feature exactly: face shape, eye spacing, nose structure, jawline, skin tone, and all distinctive characteristics. Do not alter, age, smooth, or modify any facial features.
+
+CLOTHING TRANSFORMATION:
+Dress the replacement person in similar professional-casual attire to Summers - a gray tweed or herringbone blazer over a dark colored shirt. The outfit should look appropriate for an academic or professional social gathering.
+
+SETTING CONTEXT:
+This is an indoor social gathering, possibly in a kitchen or break room area with beige cabinets visible in the background. Multiple men are engaged in casual conversation. The atmosphere is relaxed and intellectual - the kind of gathering you'd see at a university or think tank event.
+
+LIGHTING & STYLE:
+Match the warm indoor ambient lighting typical of candid event photography. The lighting is soft and diffused, coming from overhead fixtures. Skin tones should appear warm and natural. Preserve the candid, unposed quality of the original - this is clearly a snapshot taken during genuine conversation.
+
+COMPOSITION:
+Position the replacement person at the exact same location and scale as Summers, engaged in the group conversation. The replacement person should appear to be looking toward Epstein with a friendly, engaged expression, as if in the middle of an animated discussion. Maintain the natural group dynamics of several people conversing at a social event.
+
+OTHER PEOPLE IN SCENE (DO NOT MODIFY):
+- Far left: Older man in blue shirt with colorful tie
+- Center-back: Person with curly dark hair (partially visible)
+- Center-right: Man in light blue button-down shirt with glasses
+
+Generate a photorealistic composite that looks like an authentic candid photograph from a social gathering.`,
+
+  // ============================================
+  // Epstein Jail Mugshot - SPECIAL: Generate user NEXT TO Epstein
+  // Institutional mugshot style, beige background
+  // ============================================
+  'epstein_JAIL.webp': `Create a new composite image that places the person from the second image NEXT TO Jeffrey Epstein in a matching mugshot-style photograph.
+
+TASK: This is NOT a face replacement. Generate the person from the second image standing BESIDE Epstein, as if they were both photographed together in the same institutional mugshot setting. Epstein should remain on the LEFT side of the frame, and the new person should appear on the RIGHT.
+
+FACE PRESERVATION - CRITICAL:
+The person from the second image must have their face kept 100% identical. Preserve every facial feature exactly: face shape, eye spacing, nose structure, jawline, skin tone, and all distinctive characteristics. Do not alter, age, smooth, or modify any facial features.
+
+EPSTEIN'S APPEARANCE (PRESERVE EXACTLY):
+Epstein appears disheveled with gray stubble beard, unkempt gray hair, weathered/aged skin with visible wrinkles, and a neutral/somber expression. He is wearing a plain gray crew-neck t-shirt. His skin tone appears slightly ruddy with visible pores and age spots.
+
+CLOTHING FOR NEW PERSON:
+Dress the new person in a similar plain institutional-style garment - either a matching gray t-shirt or an orange/tan jail jumpsuit top. The clothing should look plain and institutional, appropriate for a booking photo.
+
+BACKGROUND & SETTING:
+The background is a plain beige/cream colored institutional wall - the kind used in police booking photographs. Extend this same flat, featureless background behind both subjects. There should be no visible text, height markers, or other elements - just the plain wall.
+
+LIGHTING - CRITICAL FOR MATCHING:
+This is harsh institutional fluorescent lighting from directly above and front. Apply the same unflattering overhead lighting to the new person:
+- Flat, even illumination with minimal shadows
+- Slightly harsh quality that emphasizes skin texture
+- Neutral-cool color temperature typical of fluorescent lights
+- No dramatic shadows or artistic lighting
+
+CAMERA STYLE:
+This is a standard ID/booking photograph:
+- Shot from chest-up (upper body framing)
+- Direct, straight-on angle (no artistic angles)
+- Sharp focus across the entire image
+- Clinical, documentary quality
+- Both subjects should appear at the same scale and distance from camera
+
+COMPOSITION:
+Frame both Epstein and the new person side-by-side in a horizontal composition, as if they were photographed together for a double booking photo. Both should be facing the camera directly with neutral expressions. Leave a small gap between them but they should clearly be in the same photograph together.
+
+Generate a photorealistic image that looks like an authentic institutional photograph - clinical, unflattering, and documentary in nature.`,
 
   // ============================================
   // Donald Trump & Epstein with women (DISABLED - safety filter issues)
