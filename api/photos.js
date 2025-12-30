@@ -13,7 +13,7 @@ function getEpsteinPhotos() {
   }
 
   const files = fs.readdirSync(photosDir)
-    .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+    .filter(f => /\.(jpg|jpeg|png|webp|avif)$/i.test(f))
     .map(f => ({
       name: f.replace(/\.[^.]+$/, '').replace(/-/g, ' '),
       path: `/epstein-photos/${f}`,
