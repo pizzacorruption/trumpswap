@@ -166,6 +166,61 @@ async function createCreditCheckoutSession(userId, email, quantity = 1) {
 }
 
 /**
+ * Create a Stripe Checkout session for watermark removal + 1 premium generation ($2.99)
+ * @param {string} userId - Internal user ID
+ * @param {string} email - User's email address
+ * @returns {Promise<{url: string, sessionId: string}>}
+ */
+async function createWatermarkRemovalSession(userId, email) {
+  const priceId = process.env.STRIPE_PRICE_WATERMARK;
+  if (!priceId) {
+    throw new Error('STRIPE_PRICE_WATERMARK not configured');
+  }
+
+  // Get or create user
+  const user = getUser(userId);
+  user.email = email;
+
+  // Create or retrieve Stripe customer
+  let customerId = user.stripe_customer_id;
+
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      email,
+      metadata: {
+        userId
+      }
+    });
+    customerId = customer.id;
+    user.stripe_customer_id = customerId;
+  }
+
+  // Create checkout session for one-time watermark removal purchase
+  const session = await stripe.checkout.sessions.create({
+    customer: customerId,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    mode: 'payment',  // One-time payment
+    success_url: `${process.env.APP_URL || 'http://localhost:3000'}/?watermark_removed=true&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/?canceled=true`,
+    metadata: {
+      userId,
+      type: 'watermark_removal'
+    }
+  });
+
+  return {
+    url: session.url,
+    sessionId: session.id
+  };
+}
+
+/**
  * Create a Stripe Customer Portal session for subscription management
  * @param {string} customerId - Stripe customer ID
  * @returns {Promise<{url: string}>}
@@ -219,6 +274,27 @@ async function handleWebhook(event) {
           creditsAdded: quantity,
           stripe_customer_id: customerId,
           checkoutType: 'credit'
+        };
+      }
+
+      // Handle watermark removal purchase ($2.99 = 1 premium generation, watermark-free)
+      if (checkoutType === 'watermark_removal') {
+        if (userId) {
+          const user = getUser(userId);
+          user.stripe_customer_id = customerId;
+          // Add 2 credits (enough for 1 premium generation which costs 2 credits)
+          user.credit_balance = (user.credit_balance || 0) + 2;
+
+          console.log(`Watermark removal purchased by user ${userId}. Added 2 credits for premium generation. Balance: ${user.credit_balance}`);
+        }
+
+        return {
+          success: true,
+          message: 'Watermark removal + premium generation unlocked',
+          userId,
+          creditsAdded: 2,
+          stripe_customer_id: customerId,
+          checkoutType: 'watermark_removal'
         };
       }
 
@@ -521,6 +597,7 @@ async function verifyCheckoutSession(sessionId) {
 module.exports = {
   createCheckoutSession,
   createCreditCheckoutSession,
+  createWatermarkRemovalSession,
   createCustomerPortalSession,
   handleWebhook,
   cancelSubscription,
