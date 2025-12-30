@@ -954,11 +954,11 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
     console.log(`   User photo: ${userValidation.width}x${userValidation.height}px`);
 
     // Select model based on modelType:
-    // - Quick: Nano Banana (gemini-2.0-flash-exp) - fast, experimental
+    // - Quick: Nano Banana (gemini-2.5-flash-image-preview) - fast, good quality
     // - Premium: Nano Banana Pro (gemini-3-pro-image-preview) - best quality, high fidelity
     const modelName = validModelType === 'premium'
-      ? 'gemini-3-pro-image-preview'  // Nano Banana Pro (Gemini 3 Pro Image)
-      : 'gemini-2.0-flash-exp';       // Nano Banana (Gemini 2.0 Flash)
+      ? 'gemini-3-pro-image-preview'      // Nano Banana Pro (Gemini 3 Pro Image)
+      : 'gemini-2.5-flash-image-preview'; // Nano Banana (Gemini 2.5 Flash Image)
 
     console.log(`   Model: ${modelName} (${validModelType})`);
 

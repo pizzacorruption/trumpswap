@@ -49,8 +49,8 @@ This is a PARODY site made to warn about manipulated images. All outputs are syn
 ## Tech Stack
 - **Backend**: Express.js + Multer + Sharp (watermarking)
 - **AI Models**:
-  - Quick: `gemini-2.0-flash-exp` (fast, 5-10 sec)
-  - Premium: `gemini-3-pro-image-preview` (best quality, 15-30 sec)
+  - Quick: `gemini-2.5-flash-image-preview` (fast, ~$0.039/image)
+  - Premium: `gemini-3-pro-image-preview` (best quality, ~$0.134/image)
 - **Database**: Supabase (Postgres) - profiles, usage_counters tables
 - **Auth**: Supabase Auth (Google OAuth)
 - **Payments**: Stripe (subscriptions + one-time credit packs)

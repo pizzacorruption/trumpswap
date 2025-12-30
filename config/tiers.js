@@ -3,7 +3,7 @@
  * Defines usage limits for each subscription tier
  *
  * Two-Tier Generation System:
- * - Quick: Fast Gemini model (gemini-2.0-flash-exp) - more quota, instant results
+ * - Quick: Fast Gemini model (gemini-2.5-flash-image-preview) - fast, good quality
  * - Premium: High-quality Imagen 3 (imagen-3.0-generate-002) - fewer uses, best quality
  *
  * Pricing Model:
@@ -20,7 +20,7 @@ const STRIPE_PRICE_CREDIT = process.env.STRIPE_PRICE_CREDIT || null;  // $3.00 c
 const models = {
   quick: {
     name: 'Quick',
-    modelId: 'gemini-2.0-flash-exp',  // Nano Banana - fast, good quality
+    modelId: 'gemini-2.5-flash-image-preview',  // Nano Banana - fast, good quality
     provider: 'gemini',
     description: 'Fast results in seconds',
     avgTime: '5-10 seconds'

@@ -3,7 +3,7 @@
  * Handles generation counting, tier checks, and credit management
  *
  * Two-Tier Generation System:
- * - Quick (gemini-2.0-flash-exp): Fast, good quality
+ * - Quick (gemini-2.5-flash-image-preview): Fast, good quality
  * - Premium (gemini-3-pro-image-preview): Best quality
  *
  * Quotas:
