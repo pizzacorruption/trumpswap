@@ -172,7 +172,7 @@ async function createCreditCheckoutSession(userId, email, quantity = 1) {
  * @returns {Promise<{url: string, sessionId: string}>}
  */
 async function createWatermarkRemovalSession(userId, email) {
-  const priceId = process.env.STRIPE_PRICE_WATERMARK;
+  const priceId = (process.env.STRIPE_PRICE_WATERMARK || '').trim();
   if (!priceId) {
     throw new Error('STRIPE_PRICE_WATERMARK not configured');
   }
