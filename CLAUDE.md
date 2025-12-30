@@ -39,18 +39,56 @@ Put yourself next to Jeffrey Epstein. Users pick from a gallery of Epstein photo
 ## Parody & Media Literacy
 This is a PARODY site made to warn about manipulated images. All outputs are synthetic and exist to demonstrate how easily images can be faked.
 
-## Business Model
-- 3 free swaps (tracked in localStorage)
-- Debug mode for unlimited (triple-click bottom-right corner)
-- Watermark on all free tier images
-- Future: $20/mo unlimited tier, Google auth via Supabase
+## Business Model & Tiers
+- **Anonymous**: 3 quick + 1 premium (watermarked), tracked via httpOnly cookie + Supabase
+- **Free** (signed in): 5 quick + 1 premium (watermarked)
+- **Base** ($14.99/mo): 50 generations/month, watermark-free
+- **Credits**: $3 for 3 credits (1 credit = quick, 2 credits = premium)
+- Debug mode: triple-click bottom-right corner for unlimited
 
 ## Tech Stack
 - **Backend**: Express.js + Multer + Sharp (watermarking)
-- **AI Model**: `gemini-2.0-flash-exp` (Nano Banana Pro)
-- **API Key**: Stored in `.env` as `GEMINI_API_KEY`
+- **AI Models**:
+  - Quick: `gemini-2.0-flash-exp` (fast, 5-10 sec)
+  - Premium: `gemini-3-pro-image-preview` (best quality, 15-30 sec)
+- **Database**: Supabase (Postgres) - profiles, usage_counters tables
+- **Auth**: Supabase Auth (Google OAuth)
+- **Payments**: Stripe (subscriptions + one-time credit packs)
 - **Frontend**: Vanilla HTML/CSS/JS, VHS/retro dark theme
-- **Per-image prompts**: `config/photoPrompts.js`
+- **Hosting**: Vercel (serverless)
+
+## CRITICAL: Usage Tracking Architecture
+Usage is tracked in TWO layers - both must be checked:
+
+1. **Monthly Total** (`generation_count`, `monthly_generation_count`)
+   - Overall cap per billing period
+   - Displayed in header as "GENERATIONS: X / Y"
+
+2. **Model-Specific** (`quick_count`, `premium_count`)
+   - Separate quotas for quick vs premium generations
+   - Displayed on buttons as "X left"
+   - FREE tier: 5 quick + 1 premium
+   - Anonymous: 3 quick + 1 premium
+
+**The `/api/me` endpoint is in `server.js` (NOT `api/me.js`)** - this is the one that's actually used.
+
+## Environment Variables (Required)
+```
+GEMINI_API_KEY=...
+SUPABASE_URL=https://pwzcupywhrfydflongmc.supabase.co
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...  # REQUIRED for server-side profile fetching
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_PRICE_BASE=price_...
+STRIPE_PRICE_CREDIT=price_...
+APP_URL=https://pimpmyepstein.lol  # NO trailing slash!
+```
+
+## Supabase Project
+- **Project**: pimpmyepstein (`pwzcupywhrfydflongmc`)
+- **Tables**: `profiles`, `usage_counters`, `generations`
+- **RPC Functions**: `get_usage_counter`, `increment_usage_counter`
 
 ## Current State
 - Working at `http://localhost:3000`
@@ -87,8 +125,12 @@ npm run test-api      # Validate API key
 
 ## API Endpoints
 - `GET /api/photos` - Returns Epstein photo gallery
-- `POST /api/generate` - Face swap (userPhoto + epsteinPhoto path)
+- `POST /api/generate` - Face swap (userPhoto + epsteinPhoto + modelType)
+- `GET /api/me` - Current user/anonymous usage (LIVES IN server.js!)
 - `GET /api/health` - API status check
+- `POST /api/create-checkout` - Stripe checkout for subscription
+- `POST /api/buy-credits` - Stripe checkout for credit packs
+- `POST /api/webhook/stripe` - Stripe webhook handler
 
 ## Debug Mode
 Triple-click the "Debug: OFF" text in bottom-right corner to enable unlimited swaps without watermark.
@@ -122,3 +164,29 @@ Based on Google's guidance:
 - Security checks? → Parallel agents for each attack vector
 
 **Never do 5 things sequentially when you can do them in parallel.**
+
+## Common Gotchas & Debugging
+
+### "Invalid API key" errors on local
+- Check `.env` has correct `SUPABASE_SERVICE_ROLE_KEY` (not placeholder)
+- Service role key is different from anon key - get it from Supabase dashboard → Settings → API Keys
+
+### Usage not persisting after refresh
+- Check `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel env vars
+- The `/api/me` endpoint needs service role to fetch profiles
+
+### Buttons show wrong "X left" count
+- Frontend `fetchUserUsage()` must call `updateRemainingDisplay()` after getting API response
+- Check `/api/me` returns `quickRemaining`, `premiumRemaining` fields
+
+### Rate limit not blocking
+- Both monthly AND model-specific limits must be checked
+- Rate limit middleware in `middleware/rateLimit.js` blocks BEFORE Gemini API call
+
+### APP_URL issues (Stripe redirects)
+- Must be set WITHOUT trailing slash
+- Production: `https://pimpmyepstein.lol` (not `https://pimpmyepstein.lol/`)
+
+### Local auth not working
+- Auth sessions are domain-specific (localhost vs production)
+- Clear localStorage or use incognito for fresh testing
