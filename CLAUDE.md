@@ -80,8 +80,9 @@ SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...  # REQUIRED for server-side profile fetching
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_PRICE_BASE=price_...
-STRIPE_PRICE_CREDIT=price_...
+STRIPE_PRICE_BASE=price_...       # $14.99/month subscription
+STRIPE_PRICE_CREDIT=price_...     # $3/credit (legacy)
+STRIPE_PRICE_WATERMARK=price_...  # $2.99 watermark removal + premium gen
 APP_URL=https://pimpmyepstein.lol  # NO trailing slash!
 ```
 
@@ -92,10 +93,12 @@ APP_URL=https://pimpmyepstein.lol  # NO trailing slash!
 
 ## Current State
 - Working at `http://localhost:3000`
-- **3 curated Epstein photos** with custom prompts:
+- **5 curated Epstein photos** with custom prompts:
   - `epstein_bill_silk.jpg` - Clinton in silk shirts
   - `epstein_chomsky_airplane.webp` - Chomsky on airplane
-  - `epstein_woodyallen_coat.png` - Woody Allen in hooded coat
+  - `epstein_ghislain.jpg` - Ghislaine Maxwell at event
+  - `epstein.summers.avif` - Larry Summers at social gathering
+  - `epstein_JAIL.webp` - Mugshot (generates user NEXT TO Epstein)
 - Face swap workflow:
   1. Pick Epstein photo from gallery (or random)
   2. Upload your face (or use camera)
@@ -190,3 +193,83 @@ Based on Google's guidance:
 ### Local auth not working
 - Auth sessions are domain-specific (localhost vs production)
 - Clear localStorage or use incognito for fresh testing
+
+---
+
+## Agent Testing Guide
+
+### CRITICAL: Never Spend Real Money
+
+Agents must use test mode for all Stripe operations. The app uses `sk_test_` keys by default.
+
+### Unlimited Generations (X-Test-Mode Header)
+
+For testing without hitting rate limits:
+
+1. **Set secret in `.env`:**
+   ```
+   TEST_MODE_SECRET=agent-test-secret-12345
+   ```
+
+2. **Pass header with requests:**
+   ```bash
+   curl -X POST http://localhost:3000/api/generate \
+     -H "X-Test-Mode: agent-test-secret-12345" \
+     -F "userPhoto=@photo.jpg" \
+     -F "epsteinPhoto=/epstein-photos/epstein_bill_silk.jpg"
+   ```
+
+This bypasses rate limits but **keeps watermarks** to test real UX.
+
+### Stripe Testing (No Real Payments)
+
+Use the CLI tools in `tools/stripe-test.js`:
+
+```bash
+# List configured products
+node tools/stripe-test.js products
+
+# Create test checkout URL
+node tools/stripe-test.js checkout watermark
+
+# Simulate successful purchase (webhook)
+node tools/stripe-test.js webhook checkout.session.completed.watermark --userId=test123
+
+# Verify a session
+node tools/stripe-test.js verify cs_test_xxx
+```
+
+### Test Card Numbers
+
+| Card | Result |
+|------|--------|
+| `4242 4242 4242 4242` | Success |
+| `4000 0000 0000 0002` | Declined |
+| `4000 0000 0000 9995` | Insufficient funds |
+
+Use any future expiry (12/34) and any CVC (123).
+
+### Testing Purchase Flow Without Paying
+
+```bash
+# 1. Create checkout session via API
+curl -X POST http://localhost:3000/api/buy-watermark-removal \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json"
+
+# 2. DON'T complete payment - simulate webhook instead
+node tools/stripe-test.js webhook checkout.session.completed.watermark \
+  --userId=<user-id>
+
+# 3. Verify credits were added
+curl http://localhost:3000/api/me -H "Authorization: Bearer <token>"
+```
+
+### Alternative: Admin Debug Mode
+
+For UI testing in browser:
+1. Triple-click "Debug: OFF" in bottom-right
+2. Requires admin login or localhost dev mode
+3. Gives unlimited generations + removes watermarks
+
+See `tools/README.md` for complete documentation.

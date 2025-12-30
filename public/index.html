@@ -3551,8 +3551,10 @@
       const canGenerate = selectedPhoto && userFile;
 
       // Enable/disable buttons based on readiness AND remaining counts
-      generateQuickBtn.disabled = !canGenerate || quickRemainingCount <= 0;
-      generatePremiumBtn.disabled = !canGenerate || premiumRemainingCount <= 0;
+      // Debug mode bypasses quota checks (unlimited generations)
+      const bypassQuota = debugMode || isAdminLoggedIn;
+      generateQuickBtn.disabled = !canGenerate || (!bypassQuota && quickRemainingCount <= 0);
+      generatePremiumBtn.disabled = !canGenerate || (!bypassQuota && premiumRemainingCount <= 0);
 
       // Update remaining count display
       updateRemainingDisplay();

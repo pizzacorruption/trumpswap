@@ -304,6 +304,13 @@ function checkAdminMiddleware(req, res, next) {
   // NOTE: Query params intentionally NOT supported - tokens in URLs leak via referrer headers and server logs
   const token = req.cookies?.adminToken || req.headers['x-admin-token'];
   req.isAdmin = isValidAdminToken(token);
+
+  // Check for X-Test-Mode header (for agent/automated testing)
+  // Requires TEST_MODE_SECRET env var to be set
+  const testModeHeader = req.headers['x-test-mode'];
+  const testModeSecret = process.env.TEST_MODE_SECRET;
+  req.isTestMode = !!(testModeSecret && testModeHeader === testModeSecret);
+
   next();
 }
 
@@ -839,7 +846,10 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
   try {
     const userPhoto = req.file;
-    const { epsteinPhoto } = req.body;
+    const { epsteinPhoto, modelType = 'quick' } = req.body;
+
+    // Validate modelType - only allow 'quick' or 'premium'
+    const validModelType = ['quick', 'premium'].includes(modelType) ? modelType : 'quick';
 
     if (!userPhoto) {
       return res.status(400).json(createErrorResponse(
@@ -943,9 +953,17 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
     console.log(`   Epstein photo: ${epsteinPhoto}`);
     console.log(`   User photo: ${userValidation.width}x${userValidation.height}px`);
 
-    // Get the model - Nano Banana Pro (Gemini 3 Pro Image)
+    // Select model based on modelType:
+    // - Quick: Nano Banana (gemini-2.0-flash-exp) - fast, experimental
+    // - Premium: Nano Banana Pro (gemini-3-pro-image-preview) - best quality, high fidelity
+    const modelName = validModelType === 'premium'
+      ? 'gemini-3-pro-image-preview'  // Nano Banana Pro (Gemini 3 Pro Image)
+      : 'gemini-2.0-flash-exp';       // Nano Banana (Gemini 2.0 Flash)
+
+    console.log(`   Model: ${modelName} (${validModelType})`);
+
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3-pro-image-preview',
+      model: modelName,
       generationConfig: {
         responseModalities: ['image', 'text'],
       },
@@ -1058,7 +1076,7 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
             const outputMetadata = await sharp(imageBuffer).metadata();
             response.debug = {
               generationTime: elapsedTime,
-              model: 'gemini-3-pro-image-preview',
+              model: modelName,
               outputDimensions: {
                 width: outputMetadata.width,
                 height: outputMetadata.height
@@ -1261,6 +1279,38 @@ app.post('/api/buy-credits', checkoutLimiter, requireAuth, async (req, res) => {
     console.error('Credit checkout creation error:', error.message);
     res.status(500).json({
       error: 'Failed to create credit checkout session',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/buy-watermark-removal
+ * Creates a Stripe checkout session for watermark removal + premium generation ($2.99)
+ * SECURITY: Requires authentication
+ */
+app.post('/api/buy-watermark-removal', checkoutLimiter, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const email = req.user.email;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'User email not found. Please sign in again.'
+      });
+    }
+
+    const { url, sessionId } = await stripeService.createWatermarkRemovalSession(userId, email);
+
+    res.json({
+      success: true,
+      url,
+      sessionId
+    });
+  } catch (error) {
+    console.error('Watermark removal checkout error:', error.message);
+    res.status(500).json({
+      error: 'Failed to create checkout session',
       details: error.message
     });
   }

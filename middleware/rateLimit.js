@@ -71,6 +71,22 @@ function createRateLimitMiddleware(options = {}) {
         return next();
       }
 
+      // Test mode users bypass rate limits (for automated/agent testing)
+      // Requires X-Test-Mode header matching TEST_MODE_SECRET env var
+      if (req.isTestMode) {
+        console.log('[TEST] Rate limit bypassed for test mode');
+        req.usage = {
+          tier: 'test',
+          tierName: 'Test Mode',
+          used: 0,
+          limit: Infinity,
+          remaining: Infinity,
+          canGenerate: true
+        };
+        req.clientIP = ipAddress;
+        return next();
+      }
+
       // Get or create anon ID for anonymous users (persistent tracking)
       if (!userId) {
         const anonSession = getOrCreateAnonId(req, res);
