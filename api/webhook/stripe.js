@@ -22,8 +22,6 @@ const config = {
   },
 };
 
-module.exports.config = config;
-
 /**
  * Collect raw body from request stream
  * Required for Stripe webhook signature verification
@@ -191,6 +189,47 @@ async function handleCheckoutCompleted(session) {
       message: `${creditsToAdd} credit(s) added`,
       creditsAdded: creditsToAdd,
       userId
+    };
+  }
+
+  // Handle watermark removal purchase ($2.99 = 2 credits for 1 premium generation)
+  if (checkoutType === 'watermark_removal') {
+    if (!userId && customerId) {
+      const { user } = await findUserByCustomerId(customerId);
+      userId = user?.id;
+    }
+
+    // For anonymous users, we may not have a userId - that's OK for watermark removal
+    // The credits are associated via session metadata (generationId, purchaseToken)
+    if (!userId) {
+      console.log('checkout.session.completed (watermark_removal): Anonymous purchase');
+      // For anonymous purchases, we don't add credits to a user account
+      // The purchase is tracked via the session metadata
+      return {
+        success: true,
+        message: 'Watermark removal purchased (anonymous)',
+        generationId: session.metadata?.generationId,
+        purchaseToken: session.metadata?.purchaseToken,
+        anonId: session.metadata?.anonId
+      };
+    }
+
+    // For authenticated users, add 2 credits (enough for 1 premium generation)
+    const creditsToAdd = 2;
+    const { error } = await addCreditsToUser(userId, creditsToAdd, customerId);
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    console.log(`Watermark removal purchased by user ${userId}. Added ${creditsToAdd} credits for premium generation.`);
+
+    return {
+      success: true,
+      message: 'Watermark removal + premium generation unlocked',
+      creditsAdded: creditsToAdd,
+      userId,
+      generationId: session.metadata?.generationId
     };
   }
 
@@ -393,3 +432,5 @@ module.exports = async function handler(req, res) {
     ...result
   });
 };
+
+module.exports.config = config;

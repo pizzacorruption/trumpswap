@@ -606,6 +606,18 @@ async function verifyCheckoutSession(sessionId) {
     };
   }
 
+  // Watermark removal purchase (2 credits for 1 premium generation)
+  if (checkoutType === 'watermark_removal') {
+    return {
+      success: true,
+      type: 'watermark_removal',
+      userId,
+      customerId: session.customer?.id || session.customer,
+      creditsAdded: 2,  // 2 credits = 1 premium generation
+      generationId: session.metadata?.generationId
+    };
+  }
+
   // Subscription checkout
   return {
     success: true,

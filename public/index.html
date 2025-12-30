@@ -3019,11 +3019,19 @@
         const res = await fetch('/api/admin/status', {
           credentials: 'include' // Required for httpOnly cookies
         });
+        // Handle non-JSON responses gracefully (e.g., 404 HTML pages)
+        if (!res.ok) {
+          return false;
+        }
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          return false;
+        }
         const data = await res.json();
         isAdminLoggedIn = data.isAdmin === true;
         return isAdminLoggedIn;
       } catch (err) {
-        console.error('Admin status check failed:', err);
+        // Silently fail - admin status is not critical for anonymous users
         return false;
       }
     }
@@ -3380,6 +3388,68 @@
         } else {
           setDebugMode(false, 'none');
         }
+      }
+
+      // Handle watermark removal success redirect
+      await handleWatermarkRemovalRedirect();
+    }
+
+    /**
+     * Handle redirect back from Stripe after watermark removal purchase
+     * Detects ?watermark_removed=true&session_id=... URL parameters
+     */
+    async function handleWatermarkRemovalRedirect() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const watermarkRemoved = urlParams.get('watermark_removed');
+      const sessionId = urlParams.get('session_id');
+      const canceled = urlParams.get('canceled');
+
+      // Handle canceled checkout
+      if (canceled === 'true') {
+        showToast('CHECKOUT CANCELED');
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+
+      // Handle successful watermark removal purchase
+      if (watermarkRemoved === 'true' && sessionId) {
+        try {
+          // Show immediate success feedback
+          showToast('WATERMARK REMOVAL UNLOCKED!');
+
+          // Verify the session with the server (fallback for when webhooks don't fire)
+          const token = getAuthToken();
+          if (token) {
+            const response = await fetch('/api/verify-session', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ sessionId })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              console.log('Watermark removal session verified:', result);
+
+              // Refresh user usage stats to reflect new credits
+              await fetchUserUsage();
+              updateAuthUI();
+            } else {
+              console.warn('Could not verify watermark removal session:', await response.text());
+            }
+          } else {
+            // For anonymous users, just refresh usage
+            await fetchAnonymousUsage();
+          }
+        } catch (err) {
+          console.warn('Error verifying watermark removal session:', err);
+        }
+
+        // Clean up URL to remove query params
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
 

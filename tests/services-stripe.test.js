@@ -1084,6 +1084,436 @@ async function runUserManagementTests() {
 }
 
 // ============================================
+// WATERMARK REMOVAL CHECKOUT SESSION TESTS
+// ============================================
+
+/**
+ * Extended mock Stripe service for watermark removal tests
+ */
+function createWatermarkRemovalMockService() {
+  const mockStripe = new MockStripe();
+  const users = new Map();
+  let priceWatermarkConfigured = true; // Can be toggled for tests
+
+  function getUser(userId) {
+    if (!users.has(userId)) {
+      users.set(userId, {
+        userId,
+        email: null,
+        tier: 'free',
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        credit_balance: 0
+      });
+    }
+    return users.get(userId);
+  }
+
+  async function createWatermarkRemovalSession(userId, email) {
+    // Simulate STRIPE_PRICE_WATERMARK not configured
+    if (!priceWatermarkConfigured) {
+      throw new Error('STRIPE_PRICE_WATERMARK not configured');
+    }
+
+    const user = getUser(userId);
+    user.email = email;
+
+    let customerId = user.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await mockStripe.customers.create({
+        email,
+        metadata: { userId }
+      });
+      customerId = customer.id;
+      user.stripe_customer_id = customerId;
+    }
+
+    const session = await mockStripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [{ price: 'price_watermark_test', quantity: 1 }],
+      mode: 'payment',
+      success_url: 'http://localhost:3000/?watermark_removed=true&session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: 'http://localhost:3000/?canceled=true',
+      metadata: {
+        userId,
+        type: 'watermark_removal'
+      }
+    });
+
+    return {
+      url: session.url,
+      sessionId: session.id
+    };
+  }
+
+  async function handleWebhook(event) {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const userId = session.metadata?.userId;
+        const customerId = session.customer;
+        const metadataType = session.metadata?.type;
+
+        // Handle watermark removal purchase
+        if (metadataType === 'watermark_removal') {
+          if (userId) {
+            const user = getUser(userId);
+            user.stripe_customer_id = customerId;
+            // Add 2 credits (enough for 1 premium generation which costs 2 credits)
+            user.credit_balance = (user.credit_balance || 0) + 2;
+          }
+
+          return {
+            success: true,
+            message: 'Watermark removal + premium generation unlocked',
+            userId,
+            creditsAdded: 2,
+            stripe_customer_id: customerId,
+            checkoutType: 'watermark_removal'
+          };
+        }
+
+        // Handle credit purchases
+        if (metadataType === 'credit') {
+          const quantity = parseInt(session.metadata?.quantity || '1', 10);
+
+          if (userId) {
+            const user = getUser(userId);
+            user.stripe_customer_id = customerId;
+            user.credit_balance = (user.credit_balance || 0) + quantity;
+          }
+
+          return {
+            success: true,
+            message: `${quantity} credit(s) added`,
+            userId,
+            creditsAdded: quantity,
+            stripe_customer_id: customerId,
+            checkoutType: 'credit'
+          };
+        }
+
+        // Default subscription handling
+        const subscriptionId = session.subscription;
+        if (userId) {
+          const user = getUser(userId);
+          user.tier = 'base';
+          user.stripe_customer_id = customerId;
+          user.stripe_subscription_id = subscriptionId;
+        }
+
+        return {
+          success: true,
+          message: 'Subscription activated',
+          userId,
+          tier: 'base',
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          checkoutType: 'subscription'
+        };
+      }
+
+      default:
+        return { success: true, message: `Unhandled event type: ${event.type}` };
+    }
+  }
+
+  return {
+    createWatermarkRemovalSession,
+    handleWebhook,
+    getUser,
+    setPriceWatermarkConfigured: (value) => { priceWatermarkConfigured = value; },
+    _mockStripe: mockStripe,
+    _users: users,
+    _clearUsers: () => users.clear()
+  };
+}
+
+async function runWatermarkRemovalCheckoutTests() {
+  console.log('\n=== createWatermarkRemovalSession Tests ===\n');
+
+  const service = createWatermarkRemovalMockService();
+
+  // -------------------------------------------
+  // Missing Configuration Tests
+  // -------------------------------------------
+  console.log('  Missing Configuration:');
+
+  await test('throws error if STRIPE_PRICE_WATERMARK not configured', async () => {
+    service.setPriceWatermarkConfigured(false);
+    await assertThrowsAsync(
+      () => service.createWatermarkRemovalSession('user-no-config', 'test@example.com'),
+      'STRIPE_PRICE_WATERMARK not configured',
+      'Should throw when price ID is not configured'
+    );
+    service.setPriceWatermarkConfigured(true); // Reset
+  });
+
+  // -------------------------------------------
+  // Customer Creation Tests
+  // -------------------------------------------
+  console.log('\n  Customer Creation:');
+
+  await test('creates customer if not exists', async () => {
+    service._clearUsers();
+    const result = await service.createWatermarkRemovalSession('new-watermark-user', 'new@example.com');
+
+    const user = service.getUser('new-watermark-user');
+    assertExists(user.stripe_customer_id, 'Should set customer ID');
+    assertTrue(user.stripe_customer_id.startsWith('cus_'), 'Customer ID should start with cus_');
+  });
+
+  await test('reuses existing customer for returning user', async () => {
+    service._clearUsers();
+
+    // First session creates customer
+    await service.createWatermarkRemovalSession('returning-watermark-user', 'return@example.com');
+    const customerId1 = service.getUser('returning-watermark-user').stripe_customer_id;
+
+    // Second session reuses customer
+    await service.createWatermarkRemovalSession('returning-watermark-user', 'return@example.com');
+    const customerId2 = service.getUser('returning-watermark-user').stripe_customer_id;
+
+    assertEqual(customerId1, customerId2, 'Should reuse same customer ID');
+  });
+
+  // -------------------------------------------
+  // Session Return Values Tests
+  // -------------------------------------------
+  console.log('\n  Session Return Values:');
+
+  await test('returns url and sessionId', async () => {
+    service._clearUsers();
+    const result = await service.createWatermarkRemovalSession('url-test-user', 'url@example.com');
+
+    assertExists(result.url, 'Should return URL');
+    assertExists(result.sessionId, 'Should return session ID');
+  });
+
+  await test('url is a valid Stripe checkout URL', async () => {
+    service._clearUsers();
+    const result = await service.createWatermarkRemovalSession('checkout-url-user', 'checkout@example.com');
+
+    assertTrue(result.url.includes('checkout.stripe.com'), 'URL should be a Stripe checkout URL');
+  });
+
+  await test('sessionId has expected format', async () => {
+    service._clearUsers();
+    const result = await service.createWatermarkRemovalSession('session-id-user', 'session@example.com');
+
+    assertTrue(result.sessionId.startsWith('cs_'), 'Session ID should start with cs_');
+  });
+
+  await test('updates user email', async () => {
+    service._clearUsers();
+    await service.createWatermarkRemovalSession('email-update-user', 'first@example.com');
+
+    const user = service.getUser('email-update-user');
+    assertEqual(user.email, 'first@example.com', 'Should set user email');
+  });
+}
+
+async function runWatermarkRemovalWebhookTests() {
+  console.log('\n=== Watermark Removal Webhook Tests ===\n');
+
+  const service = createWatermarkRemovalMockService();
+
+  // -------------------------------------------
+  // watermark_removal checkout type
+  // -------------------------------------------
+  console.log('  checkout.session.completed (watermark_removal):');
+
+  await test('adds 2 credits for watermark_removal type', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'watermark-user', type: 'watermark_removal' },
+          customer: 'cus_watermark_test',
+          subscription: null
+        }
+      }
+    });
+
+    assertTrue(result.success, 'Should return success');
+    assertEqual(result.creditsAdded, 2, 'Should add 2 credits');
+
+    const user = service.getUser('watermark-user');
+    assertEqual(user.credit_balance, 2, 'User should have 2 credits');
+  });
+
+  await test('returns correct checkoutType for watermark_removal', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'checkout-type-user', type: 'watermark_removal' },
+          customer: 'cus_checkout_type',
+          subscription: null
+        }
+      }
+    });
+
+    assertEqual(result.checkoutType, 'watermark_removal', 'checkoutType should be watermark_removal');
+  });
+
+  await test('returns correct message for watermark_removal', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'message-user', type: 'watermark_removal' },
+          customer: 'cus_message',
+          subscription: null
+        }
+      }
+    });
+
+    assertTrue(result.message.includes('Watermark removal'), 'Message should mention watermark removal');
+  });
+
+  await test('sets stripe_customer_id for watermark_removal', async () => {
+    service._clearUsers();
+    await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'customer-id-user', type: 'watermark_removal' },
+          customer: 'cus_specific_123',
+          subscription: null
+        }
+      }
+    });
+
+    const user = service.getUser('customer-id-user');
+    assertEqual(user.stripe_customer_id, 'cus_specific_123', 'Should set customer ID');
+  });
+
+  await test('accumulates credits on multiple watermark purchases', async () => {
+    service._clearUsers();
+
+    // First purchase
+    await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'multi-purchase-user', type: 'watermark_removal' },
+          customer: 'cus_multi',
+          subscription: null
+        }
+      }
+    });
+
+    // Second purchase
+    await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'multi-purchase-user', type: 'watermark_removal' },
+          customer: 'cus_multi',
+          subscription: null
+        }
+      }
+    });
+
+    const user = service.getUser('multi-purchase-user');
+    assertEqual(user.credit_balance, 4, 'Should have 4 credits (2 + 2)');
+  });
+
+  await test('handles missing userId in watermark_removal metadata', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { type: 'watermark_removal' }, // No userId
+          customer: 'cus_no_user',
+          subscription: null
+        }
+      }
+    });
+
+    assertTrue(result.success, 'Should still return success');
+    assertEqual(result.checkoutType, 'watermark_removal', 'checkoutType should still be watermark_removal');
+  });
+
+  // -------------------------------------------
+  // Comparison with credit type
+  // -------------------------------------------
+  console.log('\n  Comparison with credit checkout type:');
+
+  await test('credit type adds specified quantity', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'credit-user', type: 'credit', quantity: '5' },
+          customer: 'cus_credit',
+          subscription: null
+        }
+      }
+    });
+
+    assertEqual(result.creditsAdded, 5, 'Should add 5 credits');
+    assertEqual(result.checkoutType, 'credit', 'checkoutType should be credit');
+
+    const user = service.getUser('credit-user');
+    assertEqual(user.credit_balance, 5, 'User should have 5 credits');
+  });
+
+  await test('watermark_removal always adds exactly 2 credits regardless of quantity', async () => {
+    service._clearUsers();
+
+    // Even if quantity metadata existed, watermark_removal should always add 2
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'fixed-credit-user', type: 'watermark_removal', quantity: '10' },
+          customer: 'cus_fixed',
+          subscription: null
+        }
+      }
+    });
+
+    assertEqual(result.creditsAdded, 2, 'Should add exactly 2 credits for watermark_removal');
+  });
+
+  // -------------------------------------------
+  // Subscription checkout type still works
+  // -------------------------------------------
+  console.log('\n  Subscription checkout still works:');
+
+  await test('subscription type still works correctly', async () => {
+    service._clearUsers();
+    const result = await service.handleWebhook({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: { userId: 'sub-user', type: 'subscription' },
+          customer: 'cus_sub',
+          subscription: 'sub_123'
+        }
+      }
+    });
+
+    assertTrue(result.success, 'Should return success');
+    assertEqual(result.checkoutType, 'subscription', 'checkoutType should be subscription');
+    assertEqual(result.tier, 'base', 'tier should be base');
+
+    const user = service.getUser('sub-user');
+    assertEqual(user.tier, 'base', 'User tier should be base');
+    assertEqual(user.stripe_subscription_id, 'sub_123', 'Should set subscription ID');
+  });
+}
+
+// ============================================
 // MAIN TEST RUNNER
 // ============================================
 
@@ -1104,6 +1534,8 @@ async function main() {
   await runCancelSubscriptionTests();
   await runUserManagementTests();
   await runMissingStripeKeysTests();
+  await runWatermarkRemovalCheckoutTests();
+  await runWatermarkRemovalWebhookTests();
 
   // Print summary
   console.log('\n' + '='.repeat(60));

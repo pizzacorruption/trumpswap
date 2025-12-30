@@ -1362,6 +1362,11 @@ app.post('/api/verify-session', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Session does not belong to this user' });
     }
 
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not configured - cannot update profile');
+      return res.status(500).json({ error: 'Supabase admin client not configured' });
+    }
+
     // Update user profile in Supabase
     const updateData = {
       stripe_customer_id: result.customerId,
@@ -1374,18 +1379,23 @@ app.post('/api/verify-session', requireAuth, async (req, res) => {
       updateData.subscription_status = 'active';
       updateData.monthly_generation_count = 0;
       updateData.monthly_reset_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    } else if (result.type === 'credit') {
-      // For credits, increment the balance
-      const { data: profile } = await supabase
+    } else if (result.type === 'credit' || result.type === 'watermark_removal') {
+      // For credits and watermark removal, increment the balance
+      const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('credit_balance')
         .eq('id', userId)
         .single();
 
+      if (profileError) {
+        console.error('Failed to fetch credit balance:', profileError.message);
+        return res.status(500).json({ error: 'Failed to fetch credit balance' });
+      }
+
       updateData.credit_balance = (profile?.credit_balance || 0) + result.creditsAdded;
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update(updateData)
       .eq('id', userId);

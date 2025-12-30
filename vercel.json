@@ -16,6 +16,10 @@
       "dest": "/api/webhook/stripe.js"
     },
     {
+      "src": "/api/admin/status",
+      "dest": "/api/admin/status.js"
+    },
+    {
       "src": "/api/([^.]+)$",
       "dest": "/api/$1.js"
     },
