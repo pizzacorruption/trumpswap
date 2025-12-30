@@ -750,60 +750,8 @@ function handleMulterError(err, req, res, next) {
   }
 });
 
-/**
- * Add watermark to image buffer - visible but not obnoxious
- */
-async function addWatermark(inputBuffer, watermarkText = 'pimpmyepstein.lol') {
-  try {
-    const metadata = await sharp(inputBuffer).metadata();
-    const { width, height } = metadata;
-
-    const fontSize = Math.floor(Math.min(width, height) / 18);
-    const smallFontSize = Math.floor(fontSize * 0.7);
-
-    // Calculate diagonal pattern spacing (no patternTransform - libvips doesn't support it)
-    const patternWidth = Math.floor(width * 0.4);
-    const patternHeight = Math.floor(height * 0.2);
-
-    // SVG without unsupported features (no drop-shadow filter, no patternTransform)
-    // libvips has limited SVG support - keep it simple
-    const svgText = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="watermarkPattern" width="${patternWidth}" height="${patternHeight}" patternUnits="userSpaceOnUse">
-            <text x="10" y="${smallFontSize + 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
-            <text x="${patternWidth / 2}" y="${patternHeight - 10}" font-size="${smallFontSize}px" font-family="sans-serif" font-weight="600" fill="rgba(255,255,255,0.12)">${watermarkText}</text>
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#watermarkPattern)" />
-        <text x="50%" y="48%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(0,0,0,0.3)">${watermarkText}</text>
-        <text x="50%" y="50%" text-anchor="middle" font-size="${fontSize}px" font-family="sans-serif" font-weight="bold" fill="rgba(255,255,255,0.4)">${watermarkText}</text>
-      </svg>
-    `;
-
-    // Convert SVG to PNG buffer first (Sharp handles SVG better this way)
-    const svgBuffer = Buffer.from(svgText);
-    const watermarkPng = await sharp(svgBuffer, { density: 150 })
-      .resize(width, height, { fit: 'fill' })
-      .png()
-      .toBuffer();
-
-    // Composite the watermark PNG over the original image
-    const watermarkedBuffer = await sharp(inputBuffer)
-      .composite([{
-        input: watermarkPng,
-        blend: 'over'
-      }])
-      .png()
-      .toBuffer();
-
-    return watermarkedBuffer;
-  } catch (watermarkError) {
-    console.error('Watermark application failed:', watermarkError.message);
-    // Return original image if watermarking fails rather than crashing
-    return inputBuffer;
-  }
-}
+// Use font-independent watermark utility (avoids SVG font rendering issues on Vercel)
+const { addWatermark } = require('./lib/watermark');
 
 /**
  * Get list of Epstein photos for gallery
