@@ -1005,6 +1005,86 @@
       box-shadow: 6px 6px 0 #fff;
     }
 
+    /* Watermark Removal Promo */
+    .watermark-promo {
+      margin-top: 20px;
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #1a0a2e 0%, #2a1a4e 50%, #1a0a2e 100%);
+      border: 3px solid #ffd700;
+      border-radius: 0;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 30px rgba(255, 215, 0, 0.1);
+      animation: promoGlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes promoGlow {
+      from { box-shadow: 0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 30px rgba(255, 215, 0, 0.1); }
+      to { box-shadow: 0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 40px rgba(255, 215, 0, 0.2); }
+    }
+
+    .watermark-promo-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .promo-icon {
+      font-size: 1.8rem;
+      animation: sparkle 1s ease-in-out infinite;
+    }
+
+    @keyframes sparkle {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      50% { transform: scale(1.2) rotate(10deg); }
+    }
+
+    .promo-text {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+
+    .promo-text strong {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    }
+
+    .promo-price {
+      color: #ffd700;
+      font-size: 1.3rem;
+      font-weight: bold;
+      font-family: 'VT323', monospace;
+    }
+
+    .btn-remove-watermark {
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+      color: #000;
+      border: 3px solid #fff;
+      border-radius: 0;
+      font-family: 'VT323', monospace;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+      box-shadow: 4px 4px 0 #000;
+    }
+
+    .btn-remove-watermark:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 6px 6px 0 #000;
+      background: linear-gradient(135deg, #ffea00 0%, #ffd700 100%);
+    }
+
+    .watermark-promo.hidden {
+      display: none;
+    }
+
     .btn-icon {
       width: 18px;
       height: 18px;
@@ -2313,6 +2393,18 @@
         </button>
         <button class="btn-another" id="anotherBtn">GO AGAIN</button>
       </div>
+
+      <!-- Watermark Removal Promo - shown for free/anonymous users -->
+      <div class="watermark-promo" id="watermarkPromo">
+        <div class="watermark-promo-content">
+          <span class="promo-icon">✨</span>
+          <div class="promo-text">
+            <strong>Remove Watermark + Get 1 Premium Generation</strong>
+            <span class="promo-price">Just $2.99</span>
+          </div>
+          <button class="btn-remove-watermark" id="removeWatermarkBtn">UNLOCK NOW</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2518,6 +2610,8 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const shareBtn = document.getElementById('shareBtn');
     const anotherBtn = document.getElementById('anotherBtn');
+    const watermarkPromo = document.getElementById('watermarkPromo');
+    const removeWatermarkBtn = document.getElementById('removeWatermarkBtn');
     const errorDiv = document.getElementById('error');
     const usageBadge = document.getElementById('usageBadge');
     const debugToggle = document.getElementById('debugToggle');
@@ -3658,6 +3752,9 @@
         result.classList.add('visible');
         result.classList.add('animate-in');
 
+        // Show/hide watermark removal promo based on user tier
+        updateWatermarkPromo();
+
       } catch (err) {
         stopLoadingMessages();
         recIndicator.textContent = 'REC ●';
@@ -3759,6 +3856,48 @@
       selectRandomPhoto();
       checkReady();
     });
+
+    // Remove Watermark button - redirect to Stripe checkout
+    removeWatermarkBtn.addEventListener('click', async () => {
+      // Check if user is logged in
+      if (!currentUser) {
+        // Show auth overlay to sign in first
+        showError('Please sign in to purchase watermark removal');
+        authOverlay.classList.add('visible');
+        return;
+      }
+
+      try {
+        removeWatermarkBtn.disabled = true;
+        removeWatermarkBtn.textContent = 'LOADING...';
+
+        const res = await fetch('/api/buy-watermark-removal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error(data.error || 'Failed to create checkout');
+        }
+      } catch (err) {
+        showError(err.message);
+        removeWatermarkBtn.disabled = false;
+        removeWatermarkBtn.textContent = 'UNLOCK NOW';
+      }
+    });
+
+    // Show/hide watermark promo based on user tier (hide for paid users)
+    function updateWatermarkPromo() {
+      if (!watermarkPromo) return;
+      // Hide for base/paid users (they already have watermark-free)
+      // Show for free/anonymous users
+      const isPaidUser = userTier === 'base' || userTier === 'pro';
+      watermarkPromo.classList.toggle('hidden', isPaidUser || debugMode || isAdminLoggedIn);
+    }
 
     // Usage badge
     function updateUsageBadge() {
