@@ -7,7 +7,7 @@
  * - Premium: High-quality Imagen 3 (imagen-3.0-generate-002) - fewer uses, best quality
  *
  * Pricing Model:
- * - Anonymous/Free users get 3 quick + 1 premium watermarked generation
+ * - Anonymous users get 3 quick watermarked generations (no premium)
  * - Base subscription: $14.99/month for 100 quick + 10 premium watermark-free
  * - Credits: $3.00 for 3 premium generations
  */
@@ -38,12 +38,12 @@ module.exports = {
   models,
 
   anonymous: {
-    limit: 4,  // 3 quick + 1 premium
-    monthlyLimit: 4,
+    limit: 3,  // 3 quick only
+    monthlyLimit: 3,
     quickLimit: 3,
-    premiumLimit: 1,
+    premiumLimit: 0,
     name: 'Anonymous',
-    description: 'Try 3 quick + 1 premium generation',
+    description: 'Try 3 quick generations',
     watermarkFree: false,
     canPurchaseCredits: false
   },

@@ -40,7 +40,7 @@ Put yourself next to Jeffrey Epstein. Users pick from a gallery of Epstein photo
 This is a PARODY site made to warn about manipulated images. All outputs are synthetic and exist to demonstrate how easily images can be faked.
 
 ## Business Model & Tiers
-- **Anonymous**: 3 quick + 1 premium (watermarked), tracked via httpOnly cookie + Supabase
+- **Anonymous**: 3 quick only (watermarked), tracked via httpOnly cookie + Supabase
 - **Free** (signed in): 5 quick + 1 premium (watermarked)
 - **Base** ($14.99/mo): 50 generations/month, watermark-free
 - **Credits**: $3 for 3 credits (1 credit = quick, 2 credits = premium)
@@ -68,7 +68,7 @@ Usage is tracked in TWO layers - both must be checked:
    - Separate quotas for quick vs premium generations
    - Displayed on buttons as "X left"
    - FREE tier: 5 quick + 1 premium
-   - Anonymous: 3 quick + 1 premium
+   - Anonymous: 3 quick only (no premium)
 
 **The `/api/me` endpoint is in `server.js` (NOT `api/me.js`)** - this is the one that's actually used.
 

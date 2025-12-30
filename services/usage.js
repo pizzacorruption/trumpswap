@@ -7,7 +7,7 @@
  * - Premium (gemini-3-pro-image-preview): Best quality
  *
  * Quotas:
- * - Anonymous: 3 quick + 1 premium (separate quotas, watermarked)
+ * - Anonymous: 3 quick only (watermarked)
  * - Free (registered): 5 quick + 1 premium (separate quotas, watermarked)
  * - Base ($14.99/mo): 50 total from shared pool (any model, watermark-free)
  * - Credits: 1 credit = quick, 2 credits = premium
