@@ -3,8 +3,9 @@
  * Enforces generation limits based on user tier
  */
 
-const { checkUsage, incrementUsage } = require('../services/usage');
+const { checkUsage, checkModelUsage, incrementUsage, updateAnonCache } = require('../services/usage');
 const tiers = require('../config/tiers');
+const { getOrCreateAnonId, getAnonUsage, incrementAnonUsage } = require('../lib/anon');
 
 /**
  * Get client IP address from request
@@ -33,13 +34,27 @@ function createRateLimitMiddleware(options = {}) {
   const {
     upgradeUrl = '/pricing',
     getProfile = async () => null,
-    updateProfile = async () => {}
+    updateProfile = async () => { }
   } = options;
 
   return async function rateLimitMiddleware(req, res, next) {
     try {
       const userId = req.user?.id || null;
       const ipAddress = getClientIP(req);
+      let anonId = null;
+
+      if (req.isDevDebug) {
+        req.usage = {
+          tier: 'dev',
+          tierName: 'Dev Debug',
+          used: 0,
+          limit: Infinity,
+          remaining: Infinity,
+          canGenerate: true
+        };
+        req.clientIP = ipAddress;
+        return next();
+      }
 
       // Admin users bypass rate limits entirely
       if (req.isAdmin) {
@@ -56,6 +71,15 @@ function createRateLimitMiddleware(options = {}) {
         return next();
       }
 
+      // Get or create anon ID for anonymous users (persistent tracking)
+      if (!userId) {
+        const anonSession = getOrCreateAnonId(req, res);
+        anonId = anonSession.anonId;
+
+        const anonUsage = await getAnonUsage(anonId);
+        updateAnonCache(anonId, anonUsage.quickCount, anonUsage.premiumCount);
+      }
+
       // Get user profile if authenticated
       let profile = null;
       if (userId) {
@@ -67,7 +91,7 @@ function createRateLimitMiddleware(options = {}) {
       }
 
       // Check current usage
-      const usage = checkUsage(userId, profile, ipAddress);
+      const usage = checkUsage(userId, profile, ipAddress, 'quick', anonId);
 
       // Attach usage info to request for downstream use
       req.usage = usage;
@@ -94,25 +118,68 @@ function createRateLimitMiddleware(options = {}) {
 
       // Store original json method to intercept successful responses
       const originalJson = res.json.bind(res);
-      res.json = async function(data) {
+      res.json = async function (data) {
         // Only increment usage on successful generation
         if (data && data.success === true) {
           try {
-            const result = incrementUsage(userId, profile, ipAddress);
+            // Get and validate modelType from request body (parsed by multer before handler runs)
+            // SECURITY: server.js always uses premium model (gemini-3-pro-image-preview)
+            // so we force 'premium' to prevent client-side quota manipulation
+            let modelType = (req.body?.modelType || 'quick').toLowerCase().trim();
 
-            // Update database if needed
+            // Validate modelType - only allow 'quick' or 'premium'
+            if (modelType !== 'quick' && modelType !== 'premium') {
+              modelType = 'premium';  // Default to premium (more restrictive)
+            }
+
+            // IMPORTANT: Re-check usage with actual modelType for correct credit charging
+            // The initial check at line 70 was done without modelType (before body parse)
+            const actualUsage = checkModelUsage(userId, profile, modelType, ipAddress, anonId);
+
+            // Pass correct args with recalculated useCredit/creditCost
+            const result = incrementUsage(userId, profile, ipAddress, modelType, actualUsage.useCredit, actualUsage.creditCost || 0, anonId);
+
+            // Update database if needed - update ALL usage fields
             if (result.shouldUpdateDb && userId) {
-              await updateProfile(userId, {
-                generation_count: result.newCount
-              });
+              const updateData = {
+                generation_count: result.newCount,
+                monthly_generation_count: result.newMonthlyCount,
+                credit_balance: result.newCredits,
+                // Model-specific counts for free tier tracking
+                quick_count: result.newQuickCount,
+                premium_count: result.newPremiumCount
+              };
+
+              // Reset monthly_reset_at if monthly counter was reset
+              if (result.resetMonthly) {
+                const { getNextResetDate } = require('../services/usage');
+                updateData.monthly_reset_at = getNextResetDate().toISOString();
+              }
+
+              await updateProfile(userId, updateData);
             }
 
             // Add usage info to response
-            const updatedUsage = checkUsage(
-              userId,
-              profile ? { ...profile, generation_count: result.newCount } : null,
-              ipAddress
-            );
+            const updatedProfile = profile ? {
+              ...profile,
+              generation_count: result.newCount,
+              monthly_generation_count: result.newMonthlyCount,
+              credit_balance: result.newCredits,
+              quick_count: result.newQuickCount,
+              premium_count: result.newPremiumCount
+            } : null;
+
+            if (!userId && anonId) {
+              const persist = await incrementAnonUsage(anonId, modelType, {
+                ipAddress,
+                userAgent: req.headers['user-agent']
+              });
+              if (persist.success) {
+                updateAnonCache(anonId, persist.quickCount, persist.premiumCount);
+              }
+            }
+
+            const updatedUsage = checkUsage(userId, updatedProfile, ipAddress, modelType, anonId);
 
             data.usage = {
               used: updatedUsage.used,
@@ -146,9 +213,9 @@ function createRateLimitMiddleware(options = {}) {
 function getUpgradeMessage(tier) {
   switch (tier) {
     case 'anonymous':
-      return 'Sign up for free to get 3 more generations!';
+      return 'Sign up for free to track your creations!';
     case 'free':
-      return 'Upgrade to Pro for unlimited generations!';
+      return 'Upgrade to Base for 100 watermark-free images/month!';
     default:
       return 'Upgrade your plan for more generations.';
   }

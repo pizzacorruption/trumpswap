@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -35,19 +36,22 @@
       height: 100%;
       pointer-events: none;
       z-index: 10000;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0.15) 0px,
-        rgba(0, 0, 0, 0.15) 1px,
-        transparent 1px,
-        transparent 2px
-      );
+      background: repeating-linear-gradient(0deg,
+          rgba(0, 0, 0, 0.15) 0px,
+          rgba(0, 0, 0, 0.15) 1px,
+          transparent 1px,
+          transparent 2px);
       animation: scanlines 0.1s linear infinite;
     }
 
     @keyframes scanlines {
-      0% { transform: translateY(0); }
-      100% { transform: translateY(2px); }
+      0% {
+        transform: translateY(0);
+      }
+
+      100% {
+        transform: translateY(2px);
+      }
     }
 
     /* Random screen flicker */
@@ -65,15 +69,41 @@
     }
 
     @keyframes flicker {
-      0% { opacity: 0.97; }
-      5% { opacity: 0.95; }
-      10% { opacity: 0.97; }
-      15% { opacity: 0.94; }
-      20% { opacity: 0.98; }
-      50% { opacity: 0.96; }
-      80% { opacity: 0.97; }
-      90% { opacity: 0.94; }
-      100% { opacity: 0.98; }
+      0% {
+        opacity: 0.97;
+      }
+
+      5% {
+        opacity: 0.95;
+      }
+
+      10% {
+        opacity: 0.97;
+      }
+
+      15% {
+        opacity: 0.94;
+      }
+
+      20% {
+        opacity: 0.98;
+      }
+
+      50% {
+        opacity: 0.96;
+      }
+
+      80% {
+        opacity: 0.97;
+      }
+
+      90% {
+        opacity: 0.94;
+      }
+
+      100% {
+        opacity: 0.98;
+      }
     }
 
     body {
@@ -96,20 +126,65 @@
 
     /* Glitch text effect */
     @keyframes glitch {
-      0% { text-shadow: 2px 0 #ff0000, -2px 0 #00ffff; transform: translate(0); }
-      20% { text-shadow: -2px 0 #ff0000, 2px 0 #00ffff; transform: translate(-2px, 2px); }
-      40% { text-shadow: 2px 0 #ff0000, -2px 0 #00ffff; transform: translate(2px, -2px); }
-      60% { text-shadow: -2px 0 #ff0000, 2px 0 #00ffff; transform: translate(0); }
-      80% { text-shadow: 2px 0 #ff0000, -2px 0 #00ffff; transform: translate(-2px, -2px); }
-      100% { text-shadow: 2px 0 #ff0000, -2px 0 #00ffff; transform: translate(0); }
+      0% {
+        text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+        transform: translate(0);
+      }
+
+      20% {
+        text-shadow: -2px 0 #ff0000, 2px 0 #00ffff;
+        transform: translate(-2px, 2px);
+      }
+
+      40% {
+        text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+        transform: translate(2px, -2px);
+      }
+
+      60% {
+        text-shadow: -2px 0 #ff0000, 2px 0 #00ffff;
+        transform: translate(0);
+      }
+
+      80% {
+        text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+        transform: translate(-2px, -2px);
+      }
+
+      100% {
+        text-shadow: 2px 0 #ff0000, -2px 0 #00ffff;
+        transform: translate(0);
+      }
     }
 
     @keyframes glitchHard {
-      0%, 90%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
-      92% { clip-path: inset(40% 0 30% 0); transform: translate(-5px, 0); }
-      94% { clip-path: inset(10% 0 60% 0); transform: translate(5px, 0); }
-      96% { clip-path: inset(70% 0 10% 0); transform: translate(-3px, 0); }
-      98% { clip-path: inset(30% 0 50% 0); transform: translate(3px, 0); }
+
+      0%,
+      90%,
+      100% {
+        clip-path: inset(0 0 0 0);
+        transform: translate(0);
+      }
+
+      92% {
+        clip-path: inset(40% 0 30% 0);
+        transform: translate(-5px, 0);
+      }
+
+      94% {
+        clip-path: inset(10% 0 60% 0);
+        transform: translate(5px, 0);
+      }
+
+      96% {
+        clip-path: inset(70% 0 10% 0);
+        transform: translate(-3px, 0);
+      }
+
+      98% {
+        clip-path: inset(30% 0 50% 0);
+        transform: translate(3px, 0);
+      }
     }
 
     /* Harsh fade in */
@@ -119,6 +194,7 @@
         transform: translateY(30px) skewX(-2deg);
         filter: blur(2px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0) skewX(0);
@@ -131,10 +207,21 @@
       animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     }
 
-    .fade-in-up.delay-1 { animation-delay: 0.1s; }
-    .fade-in-up.delay-2 { animation-delay: 0.2s; }
-    .fade-in-up.delay-3 { animation-delay: 0.3s; }
-    .fade-in-up.delay-4 { animation-delay: 0.4s; }
+    .fade-in-up.delay-1 {
+      animation-delay: 0.1s;
+    }
+
+    .fade-in-up.delay-2 {
+      animation-delay: 0.2s;
+    }
+
+    .fade-in-up.delay-3 {
+      animation-delay: 0.3s;
+    }
+
+    .fade-in-up.delay-4 {
+      animation-delay: 0.4s;
+    }
 
     header {
       text-align: center;
@@ -160,17 +247,48 @@
     }
 
     @keyframes glitch {
-      0% { transform: translate(0); opacity: 1; }
-      20% { transform: translate(-2px, 1px); opacity: 0.8; }
-      40% { transform: translate(2px, -1px); opacity: 0.9; }
-      60% { transform: translate(-1px, 2px); opacity: 0.7; }
-      80% { transform: translate(1px, -2px); opacity: 0.8; }
-      100% { transform: translate(0); opacity: 1; }
+      0% {
+        transform: translate(0);
+        opacity: 1;
+      }
+
+      20% {
+        transform: translate(-2px, 1px);
+        opacity: 0.8;
+      }
+
+      40% {
+        transform: translate(2px, -1px);
+        opacity: 0.9;
+      }
+
+      60% {
+        transform: translate(-1px, 2px);
+        opacity: 0.7;
+      }
+
+      80% {
+        transform: translate(1px, -2px);
+        opacity: 0.8;
+      }
+
+      100% {
+        transform: translate(0);
+        opacity: 1;
+      }
     }
 
     @keyframes blink {
-      0%, 50% { opacity: 1; }
-      51%, 100% { opacity: 0; }
+
+      0%,
+      50% {
+        opacity: 1;
+      }
+
+      51%,
+      100% {
+        opacity: 0;
+      }
     }
 
     h1 {
@@ -315,12 +433,10 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(
-        180deg,
-        transparent 0%,
-        rgba(255, 0, 255, 0.2) 50%,
-        transparent 100%
-      );
+      background: linear-gradient(180deg,
+          transparent 0%,
+          rgba(255, 0, 255, 0.2) 50%,
+          transparent 100%);
       opacity: 0;
       transition: opacity 0.2s ease;
       z-index: 1;
@@ -329,8 +445,13 @@
     }
 
     @keyframes vhsLine {
-      0% { transform: translateY(-100%); }
-      100% { transform: translateY(100%); }
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(100%);
+      }
     }
 
     .gallery-item:hover {
@@ -380,8 +501,13 @@
     }
 
     @keyframes scaleIn {
-      from { transform: scale(0) rotate(180deg); }
-      to { transform: scale(1) rotate(0deg); }
+      from {
+        transform: scale(0) rotate(180deg);
+      }
+
+      to {
+        transform: scale(1) rotate(0deg);
+      }
     }
 
     .gallery-item.selected .check {
@@ -424,13 +550,11 @@
       transition: all 0.3s ease;
       position: relative;
       overflow: hidden;
-      background: repeating-linear-gradient(
-        45deg,
-        #111 0px,
-        #111 10px,
-        #0a0a0a 10px,
-        #0a0a0a 20px
-      );
+      background: repeating-linear-gradient(45deg,
+          #111 0px,
+          #111 10px,
+          #0a0a0a 10px,
+          #0a0a0a 20px);
     }
 
     .upload-zone::before {
@@ -446,13 +570,11 @@
 
     .upload-zone:hover {
       border-color: #00ff00;
-      background: repeating-linear-gradient(
-        45deg,
-        #001100 0px,
-        #001100 10px,
-        #002200 10px,
-        #002200 20px
-      );
+      background: repeating-linear-gradient(45deg,
+          #001100 0px,
+          #001100 10px,
+          #002200 10px,
+          #002200 20px);
     }
 
     .upload-zone.has-file {
@@ -556,12 +678,10 @@
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.2),
-        transparent
-      );
+      background: linear-gradient(90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent);
       transition: left 0.5s ease;
       z-index: -1;
       pointer-events: none;
@@ -595,11 +715,78 @@
     .btn-generate:disabled {
       opacity: 0.3;
       cursor: not-allowed;
-      transform: none;
-      background: #333;
+    }
+
+    /* Dual generate buttons container */
+    .generate-buttons {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .generate-buttons .btn-generate {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 16px 12px;
+    }
+
+    .generate-buttons .btn-generate small {
+      font-size: 0.7rem;
+      opacity: 0.8;
+      font-family: 'VT323', monospace;
+    }
+
+    /* Quick button - green accent */
+    .btn-quick {
+      background: linear-gradient(135deg, #1a1a1a 0%, #0a3a0a 100%);
+      border-color: #00ff00;
+    }
+
+    .btn-quick:hover:not(:disabled) {
+      background: #00ff00;
+    }
+
+    .btn-quick::before {
+      background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.4), transparent);
+    }
+
+    /* Premium button - gold accent */
+    .btn-premium {
+      background: linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 100%);
+      border-color: #ffd700;
+      color: #ffd700;
+    }
+
+    .btn-premium span {
+      color: #ffd700;
+    }
+
+    .btn-premium:hover:not(:disabled) {
+      background: #ffd700;
+      color: #000;
+    }
+
+    .btn-premium:hover:not(:disabled) span {
+      color: #000;
+    }
+
+    .btn-premium::before {
+      background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
+    }
+
+    /* Disabled state for generate buttons */
+    .btn-quick:disabled,
+    .btn-premium:disabled {
+      background: #1a1a1a;
+      border-color: #444;
+    }
+
+    .btn-quick:disabled span,
+    .btn-premium:disabled span {
       color: #666;
-      border-color: #666;
-      box-shadow: 4px 4px 0 #333;
     }
 
     /* Loading - VHS tracking style */
@@ -640,7 +827,9 @@
     }
 
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .loading-title {
@@ -677,31 +866,41 @@
 
     .progress-fill {
       height: 100%;
-      background: repeating-linear-gradient(
-        90deg,
-        #ff0000 0px,
-        #ff0000 10px,
-        #ffff00 10px,
-        #ffff00 20px,
-        #00ff00 20px,
-        #00ff00 30px,
-        #00ffff 30px,
-        #00ffff 40px,
-        #ff00ff 40px,
-        #ff00ff 50px
-      );
+      background: repeating-linear-gradient(90deg,
+          #ff0000 0px,
+          #ff0000 10px,
+          #ffff00 10px,
+          #ffff00 20px,
+          #00ff00 20px,
+          #00ff00 30px,
+          #00ffff 30px,
+          #00ffff 40px,
+          #ff00ff 40px,
+          #ff00ff 50px);
       animation: progressPulse 1s ease-in-out infinite, progressScroll 0.5s linear infinite;
       width: 60%;
     }
 
     @keyframes progressPulse {
-      0%, 100% { width: 30%; }
-      50% { width: 90%; }
+
+      0%,
+      100% {
+        width: 30%;
+      }
+
+      50% {
+        width: 90%;
+      }
     }
 
     @keyframes progressScroll {
-      0% { background-position: 0 0; }
-      100% { background-position: 50px 0; }
+      0% {
+        background-position: 0 0;
+      }
+
+      100% {
+        background-position: 50px 0;
+      }
     }
 
     .loading-tips {
@@ -751,7 +950,9 @@
       flex-wrap: wrap;
     }
 
-    .btn-download, .btn-share, .btn-another {
+    .btn-download,
+    .btn-share,
+    .btn-another {
       padding: 14px 28px;
       font-size: 1.1rem;
       font-weight: 400;
@@ -852,9 +1053,21 @@
     }
 
     @keyframes shake {
-      0%, 100% { transform: translateX(0) rotate(0); }
-      20%, 60% { transform: translateX(-10px) rotate(-2deg); }
-      40%, 80% { transform: translateX(10px) rotate(2deg); }
+
+      0%,
+      100% {
+        transform: translateX(0) rotate(0);
+      }
+
+      20%,
+      60% {
+        transform: translateX(-10px) rotate(-2deg);
+      }
+
+      40%,
+      80% {
+        transform: translateX(10px) rotate(2deg);
+      }
     }
 
     .error.visible {
@@ -895,7 +1108,8 @@
       font-family: 'VT323', monospace;
       border: 2px solid #00ff00;
       text-transform: uppercase;
-      display: none; /* Hidden until admin logs in */
+      display: none;
+      /* Hidden until admin logs in */
     }
 
     .debug-toggle:hover {
@@ -1239,6 +1453,7 @@
         opacity: 0;
         transform: translateX(20px);
       }
+
       to {
         opacity: 1;
         transform: translateX(0);
@@ -1491,7 +1706,9 @@
         gap: 10px;
       }
 
-      .btn-download, .btn-share, .btn-another {
+      .btn-download,
+      .btn-share,
+      .btn-another {
         width: 100%;
         justify-content: center;
         padding: 14px 20px;
@@ -1645,7 +1862,7 @@
       border: 2px solid #ff0000;
     }
 
-    .user-tier.pro {
+    .user-tier.base {
       background: #ffff00;
       color: #000;
       border: 2px solid #000;
@@ -1770,18 +1987,21 @@
       left: 0;
       right: 0;
       height: 60px;
-      background: linear-gradient(
-        180deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.1) 50%,
-        transparent 100%
-      );
+      background: linear-gradient(180deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.1) 50%,
+          transparent 100%);
       animation: trackingBar 3s ease-in-out infinite;
     }
 
     @keyframes trackingBar {
-      0% { top: -60px; }
-      100% { top: 100%; }
+      0% {
+        top: -60px;
+      }
+
+      100% {
+        top: 100%;
+      }
     }
 
     .auth-overlay.hidden {
@@ -1931,6 +2151,7 @@
     }
   </style>
 </head>
+
 <body>
   <!-- Full-page auth overlay - shown until user signs in -->
   <div class="auth-overlay" id="authOverlay">
@@ -1953,10 +2174,14 @@
       <!-- Logged out state -->
       <button class="btn-google auth-hidden" id="googleSignInBtn">
         <svg viewBox="0 0 24 24">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          <path fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+          <path fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+          <path fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+          <path fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
         </svg>
         SIGN IN
       </button>
@@ -1968,10 +2193,12 @@
           <span class="usage-counter-value" id="usageCounterValue">0 / 3</span>
         </div>
         <button class="btn-upgrade auth-hidden" id="upgradeBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
           </svg>
-          Upgrade to Pro
+          UPGRADE
         </button>
         <div class="user-info">
           <span class="user-name" id="userName">User</span>
@@ -1986,8 +2213,9 @@
       <span class="rec-indicator" id="recIndicator">REC ●</span>
       <h1>PIMP MY EPSTEIN</h1>
       <p class="subtitle">HANG OUT WITH EPSTEIN, USING AI</p>
-      <div class="usage-badge" id="usageBadge">3 SWAPS REMAINING</div>
-      <div class="parody-disclaimer">PARODY SITE — MEDIA LITERACY DEMO. MANIPULATED IMAGES ARE USED TO SHOW HOW EASY FAKES CAN BE.</div>
+      <div class="usage-badge" id="usageBadge">1 SWAP REMAINING</div>
+      <div class="parody-disclaimer">PARODY SITE — MEDIA LITERACY DEMO. MANIPULATED IMAGES ARE USED TO SHOW HOW EASY
+        FAKES CAN BE.</div>
     </header>
 
     <div id="mainContent">
@@ -2007,10 +2235,11 @@
         <div class="card-title">2. UPLOAD YOUR FACE</div>
         <div class="upload-zone" id="uploadZone">
           <div class="upload-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
             </svg>
           </div>
           <div class="upload-text">DROP FILE OR CLICK TO UPLOAD</div>
@@ -2021,18 +2250,26 @@
           <img class="preview-img" id="previewImg" alt="Your photo">
         </div>
         <button class="btn-camera" id="cameraBtn" title="Open camera">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
           </svg>
           TAKE PHOTO
         </button>
       </div>
 
-      <!-- Generate -->
-      <button class="btn-generate fade-in-up delay-3" id="generateBtn" disabled>
-        <span>EXECUTE SWAP</span>
-      </button>
+      <!-- Generate Buttons - Dual Quick/Premium -->
+      <div class="generate-buttons fade-in-up delay-3">
+        <button class="btn-generate btn-quick" id="generateQuickBtn" disabled>
+          <span>⚡ QUICK (EXPERIMENTAL)</span>
+          <small id="quickRemaining">3 left</small>
+        </button>
+        <button class="btn-generate btn-premium" id="generatePremiumBtn" disabled>
+          <span>★ PREMIUM</span>
+          <small id="premiumRemaining">1 left</small>
+        </button>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -2055,20 +2292,22 @@
       </div>
       <div class="result-actions">
         <button class="btn-download" id="downloadBtn">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
           SAVE
         </button>
         <button class="btn-share" id="shareBtn">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"/>
-            <circle cx="6" cy="12" r="3"/>
-            <circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
           </svg>
           SHARE
         </button>
@@ -2088,8 +2327,9 @@
 
   <!-- Admin Badge (shown when logged in as admin) -->
   <div class="admin-badge" id="adminBadge">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+      stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </svg>
     ADMIN MODE
   </div>
@@ -2098,8 +2338,9 @@
   <div class="admin-panel" id="adminPanel">
     <div class="admin-panel-header">
       <div class="admin-panel-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
         Debug Panel
       </div>
@@ -2169,8 +2410,9 @@
     <div class="admin-modal" style="position: relative;">
       <button class="btn-admin-close" id="adminCloseBtn">&times;</button>
       <h2>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
         Admin Access
       </h2>
@@ -2222,15 +2464,20 @@
     let selectedPhoto = null;
     let userFile = null;
     let usageCount = parseInt(localStorage.getItem('epsteinswap_usage') || '0');
-    let debugMode = localStorage.getItem('epsteinswap_debug') === 'true';
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    let debugMode = false;
+    let debugModeSource = 'none'; // admin | dev | none
+    let devDebugAllowed = false;
+    let devDebugEnabled = false;
     let loadingInterval = null;
-    const MAX_USAGE = 3;        // Free registered users: 3 generations
-    const MAX_ANON_USAGE = 1;   // Anonymous users: 1 generation
+    const MAX_USAGE = 6;        // Free registered users: 5 quick + 1 premium = 6 total
+    const ANON_MAX_USAGE = 4;   // Anonymous users: 3 quick + 1 premium = 4 total
+    const MAX_ANON_USAGE = 4;   // Anonymous users: 3 quick + 1 premium = 4 total
 
     // Auth state
     let currentUser = null;
     let currentSession = null;
-    let userTier = 'free'; // 'free' or 'pro'
+    let userTier = 'free'; // 'anonymous', 'free', or 'base'
     let serverUsageCount = 0;
 
     // Admin state
@@ -2257,7 +2504,10 @@
     const fileInput = document.getElementById('fileInput');
     const previewContainer = document.getElementById('previewContainer');
     const previewImg = document.getElementById('previewImg');
-    const generateBtn = document.getElementById('generateBtn');
+    const generateQuickBtn = document.getElementById('generateQuickBtn');
+    const generatePremiumBtn = document.getElementById('generatePremiumBtn');
+    const quickRemaining = document.getElementById('quickRemaining');
+    const premiumRemaining = document.getElementById('premiumRemaining');
     const mainContent = document.getElementById('mainContent');
     const loading = document.getElementById('loading');
     const loadingTitle = document.getElementById('loadingTitle');
@@ -2328,6 +2578,49 @@
       });
     }
 
+    async function fetchDevDebugStatus() {
+      if (!isLocalhost) return;
+
+      try {
+        const res = await fetch('/api/dev/debug', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        devDebugAllowed = data.allowed === true;
+        devDebugEnabled = data.enabled === true;
+      } catch (err) {
+        devDebugAllowed = false;
+        devDebugEnabled = false;
+      }
+    }
+
+    async function setDevDebug(enabled) {
+      if (!isLocalhost) return { allowed: false, enabled: false };
+
+      const res = await fetch('/api/dev/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled })
+      });
+
+      if (!res.ok) {
+        return { allowed: false, enabled: false };
+      }
+
+      return res.json();
+    }
+
+    function setDebugMode(enabled, source) {
+      debugMode = enabled;
+      debugModeSource = source;
+      updateDebugToggle();
+      updateUsageBadge();
+    }
+
+    function updateDebugVisibility() {
+      debugToggle.style.display = (isAdminLoggedIn || devDebugAllowed) ? 'block' : 'none';
+    }
+
     // Sign in with Google
     async function signInWithGoogle() {
       if (!supabaseClient) {
@@ -2388,6 +2681,30 @@
       }
     }
 
+    async function fetchAnonymousUsage() {
+      try {
+        const res = await fetch('/api/me', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data?.usage) return;
+
+        if (typeof data.usage.quickRemaining === 'number') {
+          quickRemainingCount = Math.max(0, data.usage.quickRemaining);
+        }
+        if (typeof data.usage.premiumRemaining === 'number') {
+          premiumRemainingCount = Math.max(0, data.usage.premiumRemaining);
+        }
+
+        const used = (data.usage.quickUsed || 0) + (data.usage.premiumUsed || 0);
+        usageCount = used;
+        localStorage.setItem('epsteinswap_usage', usageCount.toString());
+        updateRemainingDisplay();
+        updateUsageBadge();
+      } catch (err) {
+        // Ignore anonymous usage fetch errors
+      }
+    }
+
     // Update UI based on auth state
     function updateAuthUI() {
       // Hide loading
@@ -2414,31 +2731,24 @@
         }
 
         // Set tier badge
-        if (userTier === 'pro') {
-          userTierBadge.textContent = 'Pro';
+        if (userTier === 'base') {
+          userTierBadge.textContent = 'Base';
           userTierBadge.classList.remove('free');
-          userTierBadge.classList.add('pro');
+          userTierBadge.classList.add('base');
           upgradeBtn.classList.add('auth-hidden');
           usageCounterValue.textContent = 'UNLIMITED';
           usageCounterValue.classList.add('unlimited');
         } else {
           userTierBadge.textContent = 'Free';
-          userTierBadge.classList.remove('pro');
+          userTierBadge.classList.remove('base');
           userTierBadge.classList.add('free');
           upgradeBtn.classList.remove('auth-hidden');
           usageCounterValue.textContent = `${serverUsageCount} / ${MAX_USAGE}`;
           usageCounterValue.classList.remove('unlimited');
         }
 
-        // Update legacy usage badge in header
-        if (userTier === 'pro') {
-          usageBadge.textContent = 'UNLIMITED SWAPS';
-          usageBadge.classList.add('debug');
-        } else {
-          const remaining = MAX_USAGE - serverUsageCount;
-          usageBadge.textContent = remaining > 0 ? `${remaining} SWAP${remaining !== 1 ? 'S' : ''} REMAINING` : 'NO SWAPS REMAINING';
-          usageBadge.classList.remove('debug');
-        }
+        // Hide legacy usage badge for logged-in users (they have usageCounter in nav)
+        usageBadge.style.display = 'none';
 
       } else {
         // Show auth overlay with Google sign-in button
@@ -2460,8 +2770,10 @@
         googleSignInBtn.classList.remove('auth-hidden');
         userProfile.classList.add('auth-hidden');
 
-        // Reset to local storage usage for non-logged-in users
+        // Show usage badge for anonymous users and update it
+        usageBadge.style.display = '';
         updateUsageBadge();
+        fetchAnonymousUsage();
       }
     }
 
@@ -2506,10 +2818,10 @@
     googleSignInBtn.addEventListener('click', signInWithGoogle);
     logoutBtn.addEventListener('click', signOut);
 
-    // Upgrade to Pro - Stripe Checkout
+    // Upgrade to Base - Stripe Checkout
     upgradeBtn.addEventListener('click', async () => {
       if (!currentUser) {
-        showError('Please sign in first to upgrade to Pro');
+        showError('Please sign in first to upgrade');
         return;
       }
 
@@ -2543,7 +2855,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
-          Upgrade to Pro
+          UPGRADE
         `;
       }
     });
@@ -2642,14 +2954,20 @@
         adminOverlay.classList.remove('visible');
         usageBadge.textContent = 'ADMIN MODE [UNLIMITED]';
         usageBadge.classList.add('debug');
-        debugToggle.style.display = 'block'; // Show debug toggle for admins
+        updateDebugVisibility();
+        const storedDebug = localStorage.getItem('epsteinswap_debug') === 'true';
+        setDebugMode(storedDebug, 'admin');
         refreshDebugPanel();
       } else {
         adminBadge.classList.remove('visible');
         adminPanel.classList.remove('visible');
         adminPanelVisible = false;
-        debugToggle.style.display = 'none'; // Hide debug toggle
-        updateUsageBadge();
+        updateDebugVisibility();
+        if (devDebugAllowed) {
+          setDebugMode(devDebugEnabled, 'dev');
+        } else {
+          setDebugMode(false, 'none');
+        }
       }
     }
 
@@ -2894,17 +3212,27 @@
     // INITIALIZATION
     // =====================================================
     async function init() {
-      updateUsageBadge();
       updateDebugToggle();
 
       // Load config from server first (required for Supabase auth)
       await loadConfig();
+
+      await fetchDevDebugStatus();
 
       await Promise.all([
         initAuth(),
         initAdmin(),
         loadGallery()
       ]);
+
+      updateDebugVisibility();
+      if (!isAdminLoggedIn) {
+        if (devDebugAllowed) {
+          setDebugMode(devDebugEnabled, 'dev');
+        } else {
+          setDebugMode(false, 'none');
+        }
+      }
     }
 
     async function loadGallery() {
@@ -3110,10 +3438,29 @@
       checkReady();
     }
 
+    // Track quick/premium remaining counts
+    let quickRemainingCount = 3;
+    let premiumRemainingCount = 1;
+
     function checkReady() {
-      // Keep tracking but don't enforce limit while developing
+      // Check if both photo and user file are selected
       const canGenerate = selectedPhoto && userFile;
-      generateBtn.disabled = !canGenerate;
+
+      // Enable/disable buttons based on readiness AND remaining counts
+      generateQuickBtn.disabled = !canGenerate || quickRemainingCount <= 0;
+      generatePremiumBtn.disabled = !canGenerate || premiumRemainingCount <= 0;
+
+      // Update remaining count display
+      updateRemainingDisplay();
+    }
+
+    function updateRemainingDisplay() {
+      if (quickRemaining) {
+        quickRemaining.textContent = quickRemainingCount > 0 ? `${quickRemainingCount} left` : 'none left';
+      }
+      if (premiumRemaining) {
+        premiumRemaining.textContent = premiumRemainingCount > 0 ? `${premiumRemainingCount} left` : 'none left';
+      }
     }
 
     // Compress image client-side to avoid Vercel's 4.5MB payload limit
@@ -3177,35 +3524,29 @@
       }
     }
 
-    // Generate
-    generateBtn.addEventListener('click', async () => {
+    // Generate function - handles both Quick and Premium
+    async function handleGenerate(modelType) {
       if (!selectedPhoto || !userFile) return;
 
-      // Usage limit enforcement (skip for debug mode, admins, and pro users)
+      // Check if user can generate with this model type
       if (!debugMode && !isAdminLoggedIn) {
-        if (currentUser) {
-          // Logged-in user
-          if (userTier === 'pro') {
-            // Pro users: unlimited - no limit check needed
-          } else {
-            // Free registered users: 3 generations
-            if (serverUsageCount >= MAX_USAGE) {
-              showError('You\'ve used all 3 free swaps! Upgrade to Pro for unlimited generations.');
-              return;
-            }
-          }
-        } else {
-          // Anonymous user: 1 generation
-          if (usageCount >= MAX_ANON_USAGE) {
-            showError('You\'ve used your free swap! Sign up for 3 free swaps, or upgrade to Pro for unlimited.');
-            return;
-          }
+        if (modelType === 'quick' && quickRemainingCount <= 0) {
+          showError('No quick generations left! Try Premium or upgrade to Base.');
+          return;
+        }
+        if (modelType === 'premium' && premiumRemainingCount <= 0) {
+          showError('No premium generations left! Upgrade to Base for more.');
+          return;
         }
       }
 
       hideError();
       mainContent.style.display = 'none';
       loading.classList.add('visible');
+
+      // Update loading message based on model type
+      const modelName = modelType === 'premium' ? 'PREMIUM' : 'QUICK (EXPERIMENTAL)';
+      loadingTitle.textContent = `${modelName} GENERATION...`;
       startLoadingMessages();
 
       // Funny VHS effect - "camera disconnected" during generation
@@ -3223,11 +3564,12 @@
 
       // Compress image client-side to avoid Vercel's 4.5MB payload limit
       const compressedFile = await compressImage(userFile, 2048, 0.85);
-      console.log(`Compressed: ${(userFile.size/1024/1024).toFixed(2)}MB → ${(compressedFile.size/1024/1024).toFixed(2)}MB`);
+      console.log(`Compressed: ${(userFile.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
 
       const formData = new FormData();
       formData.append('userPhoto', compressedFile);
       formData.append('epsteinPhoto', selectedPhoto);
+      formData.append('modelType', modelType);  // NEW: Send model type
       formData.append('debug', debugMode);
 
       try {
@@ -3262,7 +3604,7 @@
         }
 
         if (!res.ok || data.error) {
-          throw new Error(data.error || 'Generation failed');
+          throw new Error(data.error || data.message || 'Generation failed');
         }
 
         // Capture debug info for admin panel
@@ -3273,14 +3615,20 @@
           }
         }
 
-        // Increment usage (unless debug)
-        if (!debugMode) {
+        // Update usage from server response (unless debug)
+        if (!debugMode && data.usage) {
+          if (data.usage.quickRemaining !== undefined) {
+            quickRemainingCount = Math.max(0, data.usage.quickRemaining);
+          }
+          if (data.usage.premiumRemaining !== undefined) {
+            premiumRemainingCount = Math.max(0, data.usage.premiumRemaining);
+          }
+          updateRemainingDisplay();
+
           if (currentUser) {
-            // Logged in - refresh usage from server
-            serverUsageCount++;
+            serverUsageCount = data.usage.used || serverUsageCount + 1;
             updateAuthUI();
           } else {
-            // Not logged in - use local storage
             usageCount++;
             localStorage.setItem('epsteinswap_usage', usageCount.toString());
             updateUsageBadge();
@@ -3308,7 +3656,13 @@
         mainContent.style.display = 'block';
         showError(err.message);
       }
-    });
+    }
+
+    // Quick Generate button
+    generateQuickBtn.addEventListener('click', () => handleGenerate('quick'));
+
+    // Premium Generate button
+    generatePremiumBtn.addEventListener('click', () => handleGenerate('premium'));
 
     // Download
     downloadBtn.addEventListener('click', () => {
@@ -3398,7 +3752,7 @@
 
     // Usage badge
     function updateUsageBadge() {
-      const remaining = MAX_USAGE - usageCount;
+      const remaining = ANON_MAX_USAGE - usageCount;
       if (debugMode) {
         usageBadge.textContent = 'DEBUG MODE [UNLIMITED]';
         usageBadge.classList.add('debug');
@@ -3416,17 +3770,35 @@
     debugToggle.addEventListener('click', () => {
       debugClicks++;
       if (debugClicks >= 3) {
-        debugMode = !debugMode;
-        localStorage.setItem('epsteinswap_debug', debugMode.toString());
-        updateDebugToggle();
-        updateUsageBadge();
+        if (isAdminLoggedIn) {
+          const next = !debugMode;
+          localStorage.setItem('epsteinswap_debug', next.toString());
+          setDebugMode(next, 'admin');
+        } else if (devDebugAllowed) {
+          const next = !debugMode;
+          setDevDebug(next).then((result) => {
+            if (!result.allowed) {
+              showError('Dev debug not available');
+              return;
+            }
+            devDebugEnabled = result.enabled === true;
+            setDebugMode(devDebugEnabled, 'dev');
+          }).catch(() => {
+            showError('Failed to toggle dev debug');
+          });
+        }
         debugClicks = 0;
       }
       setTimeout(() => { debugClicks = 0; }, 1000);
     });
 
     function updateDebugToggle() {
-      debugToggle.textContent = `Debug: ${debugMode ? 'ON' : 'OFF'}`;
+      if (debugMode) {
+        const suffix = debugModeSource === 'dev' ? ' (LOCAL)' : '';
+        debugToggle.textContent = `Debug: ON${suffix}`;
+      } else {
+        debugToggle.textContent = 'Debug: OFF';
+      }
     }
 
     // Error handling
@@ -3443,4 +3815,5 @@
     init();
   </script>
 </body>
+
 </html>

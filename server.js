@@ -19,7 +19,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // Services
 const generations = require('./services/generations');
 const stripeService = require('./services/stripe');
-const { checkUsage, incrementUsage, getAnonymousStats } = require('./services/usage');
+const { checkUsage, incrementUsage, getAnonymousStats, updateAnonCache } = require('./services/usage');
 
 // Middleware
 const { authMiddleware, requireAuth } = require('./middleware/auth');
@@ -29,6 +29,7 @@ const { createRateLimitMiddleware, getClientIP } = require('./middleware/rateLim
 const { supabase, supabaseAdmin, getClientConfig } = require('./lib/supabase');
 const tiers = require('./config/tiers');
 const { getPromptForPhoto, photoPrompts } = require('./config/photoPrompts');
+const { getOrCreateAnonId, getAnonUsage } = require('./lib/anon');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,9 +63,18 @@ const ERROR_CODES = {
 
 // Admin password for debug mode
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
+const DEV_DEBUG_COOKIE = 'dev_debug';
 
 // In-memory admin sessions (token -> expiry timestamp)
 const adminSessions = new Map();
+
+function isLocalRequest(req) {
+  const ip = req.ip || '';
+  const host = (req.hostname || '').toLowerCase();
+  const isLocalHost = host === 'localhost' || host === '127.0.0.1';
+  const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip.startsWith('::ffff:127.');
+  return isLocalHost || isLoopback;
+}
 
 /**
  * Create structured error response
@@ -313,7 +323,7 @@ function getAdminDebugInfo() {
     },
     config: {
       apiKeySet: !!process.env.GEMINI_API_KEY,
-      stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
+      stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_BASE),
       supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
       adminConfigured: !!ADMIN_PASSWORD,
       model: 'gemini-3-pro-image-preview',
@@ -508,19 +518,20 @@ const outputLimiter = rateLimit({
 
 // SECURITY: Restrict CORS to allowed origins only
 // This prevents malicious sites from making authenticated requests on behalf of users
+const isProduction = process.env.NODE_ENV === 'production';
 const allowedOrigins = [
   'https://pimpmyepstein.lol',
   'https://www.pimpmyepstein.lol',
-  process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,
-  process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:3000' : null,
+  !isProduction ? 'http://localhost:3000' : null,
+  !isProduction ? 'http://127.0.0.1:3000' : null,
 ].filter(Boolean);
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, Postman)
-    // but only in development mode
+    // but only in non-production mode
     if (!origin) {
-      if (process.env.NODE_ENV === 'development') {
+      if (!isProduction) {
         return callback(null, true);
       }
       // In production, require origin header
@@ -561,12 +572,16 @@ app.post('/api/webhook/stripe',
       // Handle the event
       const result = await stripeService.handleWebhook(event);
 
-      // If we have a userId and tier changed, update Supabase profile
+      // If we have a userId, update Supabase profile
       // Use supabaseAdmin to bypass RLS since webhooks have no user context
-      if (result.userId && result.tier && supabaseAdmin) {
+      if (result.userId && supabaseAdmin) {
         try {
-          // Build update object with tier and optional Stripe IDs
-          const updateData = { tier: result.tier };
+          // Build update object with tier, Stripe IDs, and billing fields
+          const updateData = {};
+
+          if (result.tier) {
+            updateData.tier = result.tier;
+          }
 
           // Include stripe_customer_id if present in result
           if (result.stripe_customer_id) {
@@ -578,15 +593,34 @@ app.post('/api/webhook/stripe',
             updateData.stripe_subscription_id = result.stripe_subscription_id;
           }
 
-          const { error } = await supabaseAdmin
-            .from('profiles')
-            .update(updateData)
-            .eq('id', result.userId);
+          if ('monthly_generation_count' in result) {
+            updateData.monthly_generation_count = result.monthly_generation_count;
+          }
 
-          if (error) {
-            console.error('Failed to update Supabase profile:', error.message);
-          } else {
-            console.log(`Updated Supabase profile for user ${result.userId}:`, updateData);
+          if (result.monthly_reset_at) {
+            updateData.monthly_reset_at = result.monthly_reset_at;
+          }
+
+          const creditsAdded = Number(result.creditsAdded);
+          if (Number.isFinite(creditsAdded) && creditsAdded > 0) {
+            const profile = await getProfile(result.userId);
+            const currentCredits = profile?.credit_balance || 0;
+            updateData.credit_balance = currentCredits + creditsAdded;
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            updateData.updated_at = new Date().toISOString();
+
+            const { error } = await supabaseAdmin
+              .from('profiles')
+              .update(updateData)
+              .eq('id', result.userId);
+
+            if (error) {
+              console.error('Failed to update Supabase profile:', error.message);
+            } else {
+              console.log(`Updated Supabase profile for user ${result.userId}:`, updateData);
+            }
           }
         } catch (dbError) {
           console.error('Supabase profile update error:', dbError.message);
@@ -636,6 +670,11 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: '10mb' })); // Match multer's 10MB limit
 app.use(cookieParser()); // SECURITY: Required for httpOnly admin token cookies
+app.use((req, res, next) => {
+  const allowLocalDebug = !isProduction && isLocalRequest(req);
+  req.isDevDebug = allowLocalDebug && req.cookies?.[DEV_DEBUG_COOKIE] === '1';
+  next();
+});
 app.use(express.static('public'));
 // SECURITY: Don't serve /output statically - use authenticated endpoint instead
 // app.use('/output', express.static('output'));
@@ -1104,7 +1143,7 @@ app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, r
 
 /**
  * POST /api/create-checkout
- * Creates a Stripe checkout session for $20/mo Pro subscription
+ * Creates a Stripe checkout session for $14.99/mo Base subscription
  * SECURITY: Requires authentication and verifies userId matches authenticated user
  */
 app.post('/api/create-checkout', checkoutLimiter, requireAuth, async (req, res) => {
@@ -1193,6 +1232,148 @@ app.post('/api/cancel-subscription', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/buy-credits
+ * Creates a Stripe checkout session for credit purchase ($3/credit)
+ * SECURITY: Requires authentication
+ */
+app.post('/api/buy-credits', checkoutLimiter, requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const email = req.user.email;
+    const quantity = Math.min(Math.max(parseInt(req.body.quantity) || 1, 1), 100); // 1-100 credits
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'User email not found. Please sign in again.'
+      });
+    }
+
+    const { url, sessionId } = await stripeService.createCreditCheckoutSession(userId, email, quantity);
+
+    res.json({
+      success: true,
+      checkoutUrl: url,
+      sessionId,
+      quantity
+    });
+  } catch (error) {
+    console.error('Credit checkout creation error:', error.message);
+    res.status(500).json({
+      error: 'Failed to create credit checkout session',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/customer-portal
+ * Creates a Stripe Customer Portal session for subscription management
+ * SECURITY: Requires authentication
+ */
+app.post('/api/customer-portal', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Get user's profile to find their Stripe customer ID
+    const profile = await getProfile(userId);
+    if (!profile?.stripe_customer_id) {
+      return res.status(400).json({
+        error: 'No Stripe customer found. You need an active subscription to access the portal.'
+      });
+    }
+
+    const { url } = await stripeService.createCustomerPortalSession(profile.stripe_customer_id);
+
+    res.json({
+      success: true,
+      portalUrl: url
+    });
+  } catch (error) {
+    console.error('Customer portal creation error:', error.message);
+    res.status(500).json({
+      error: 'Failed to create customer portal session',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/verify-session
+ * Verify a completed Stripe checkout session and update user profile
+ * Used as fallback when webhooks don't work (e.g., local development)
+ * Body: { sessionId: string }
+ */
+app.post('/api/verify-session', requireAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const userId = req.user.id;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID required' });
+    }
+
+    // Verify the session with Stripe
+    const result = await stripeService.verifyCheckoutSession(sessionId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.message || 'Payment not completed' });
+    }
+
+    // Verify the session belongs to this user
+    if (result.userId && result.userId !== userId) {
+      console.warn(`Session user mismatch: expected ${userId}, got ${result.userId}`);
+      return res.status(403).json({ error: 'Session does not belong to this user' });
+    }
+
+    // Update user profile in Supabase
+    const updateData = {
+      stripe_customer_id: result.customerId,
+      updated_at: new Date().toISOString()
+    };
+
+    if (result.type === 'subscription') {
+      updateData.tier = 'base';
+      updateData.stripe_subscription_id = result.subscriptionId;
+      updateData.subscription_status = 'active';
+      updateData.monthly_generation_count = 0;
+      updateData.monthly_reset_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (result.type === 'credit') {
+      // For credits, increment the balance
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('credit_balance')
+        .eq('id', userId)
+        .single();
+
+      updateData.credit_balance = (profile?.credit_balance || 0) + result.creditsAdded;
+    }
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Failed to update profile:', updateError);
+      return res.status(500).json({ error: 'Failed to update profile' });
+    }
+
+    console.log(`Verified session ${sessionId} for user ${userId}: ${result.type}`);
+
+    res.json({
+      success: true,
+      type: result.type,
+      tier: result.type === 'subscription' ? 'base' : undefined,
+      creditsAdded: result.creditsAdded
+    });
+
+  } catch (error) {
+    console.error('Verify session error:', error);
+    res.status(500).json({ error: 'Failed to verify session' });
+  }
+});
+
 // ===== USER & USAGE ROUTES =====
 
 /**
@@ -1204,6 +1385,7 @@ app.get('/api/me', async (req, res) => {
   try {
     const userId = req.user?.id || null;
     const clientIP = getClientIP(req);
+    let anonId = null;
 
     // Get user profile if authenticated
     let profile = null;
@@ -1211,8 +1393,15 @@ app.get('/api/me', async (req, res) => {
       profile = await getProfile(userId);
     }
 
+    if (!userId) {
+      const anonSession = getOrCreateAnonId(req, res);
+      anonId = anonSession.anonId;
+      const anonUsage = await getAnonUsage(anonId);
+      updateAnonCache(anonId, anonUsage.quickCount, anonUsage.premiumCount);
+    }
+
     // Get usage info
-    const usage = checkUsage(userId, profile, clientIP);
+    const usage = checkUsage(userId, profile, clientIP, 'quick', anonId);
 
     // Build response
     const response = {
@@ -1224,6 +1413,9 @@ app.get('/api/me', async (req, res) => {
       } : null,
       profile: profile ? {
         generation_count: profile.generation_count || 0,
+        monthly_generation_count: profile.monthly_generation_count || 0,
+        monthly_reset_at: profile.monthly_reset_at || null,
+        credit_balance: profile.credit_balance || 0,
         tier: profile.tier || 'free',
         stripe_customer_id: profile.stripe_customer_id || null
       } : null,
@@ -1233,14 +1425,38 @@ app.get('/api/me', async (req, res) => {
         used: usage.used,
         limit: usage.limit,
         remaining: usage.remaining,
-        canGenerate: usage.canGenerate
+        canGenerate: usage.canGenerate,
+        // New monthly and credit fields
+        monthlyUsed: usage.monthlyUsed,
+        monthlyLimit: usage.monthlyLimit,
+        monthlyRemaining: usage.monthlyRemaining,
+        credits: usage.credits,
+        watermarkFree: usage.watermarkFree,
+        watermarkFreeReason: usage.watermarkFreeReason
       },
-      tiers: Object.entries(tiers).map(([key, value]) => ({
-        id: key,
-        name: value.name,
-        limit: value.limit === Infinity ? 'unlimited' : value.limit,
-        description: value.description
-      }))
+      tiers: Object.entries(tiers)
+        .filter(([key]) => key !== 'credit')  // Don't include credit as a tier
+        .map(([key, value]) => ({
+          id: key,
+          name: value.name,
+          limit: value.limit === Infinity ? 'unlimited' : value.limit,
+          monthlyLimit: value.monthlyLimit === Infinity ? 'unlimited' : value.monthlyLimit,
+          description: value.description,
+          watermarkFree: value.watermarkFree || false,
+          priceMonthly: value.priceMonthly || null
+        })),
+      pricing: {
+        subscription: {
+          name: tiers.base.name,
+          priceMonthly: tiers.base.priceMonthly,
+          monthlyLimit: tiers.base.monthlyLimit,
+          description: tiers.base.description
+        },
+        credit: {
+          pricePerCredit: tiers.credit.pricePerCredit,
+          description: tiers.credit.description
+        }
+      }
     };
 
     res.json(response);
@@ -1349,9 +1565,9 @@ app.get('/output/:filename', outputLimiter, async (req, res) => {
       return res.sendFile(filePath);
     }
 
-    // In development mode, serve files without strict auth (for testing)
+    // In non-production mode, serve files without strict auth (for testing)
     // This is safe because dev server is localhost only
-    if (process.env.NODE_ENV === 'development') {
+    if (!isProduction) {
       return res.sendFile(filePath);
     }
 
@@ -1387,7 +1603,7 @@ app.get('/output/:filename', outputLimiter, async (req, res) => {
 
 /**
  * GET /api/config
- * Returns public client configuration (Supabase URL, etc.)
+ * Returns public client configuration (Supabase URL, pricing, etc.)
  */
 app.get('/api/config', (req, res) => {
   const supabaseConfig = getClientConfig();
@@ -1397,12 +1613,29 @@ app.get('/api/config', (req, res) => {
       url: supabaseConfig.url,
       anonKey: supabaseConfig.anonKey
     },
-    tiers: Object.entries(tiers).map(([key, value]) => ({
-      id: key,
-      name: value.name,
-      limit: value.limit === Infinity ? 'unlimited' : value.limit,
-      description: value.description
-    }))
+    tiers: Object.entries(tiers)
+      .filter(([key]) => key !== 'credit')  // Don't include credit as a tier
+      .map(([key, value]) => ({
+        id: key,
+        name: value.name,
+        limit: value.limit === Infinity ? 'unlimited' : value.limit,
+        monthlyLimit: value.monthlyLimit === Infinity ? 'unlimited' : value.monthlyLimit,
+        description: value.description,
+        watermarkFree: value.watermarkFree || false,
+        priceMonthly: value.priceMonthly || null
+      })),
+    pricing: {
+      subscription: {
+        name: tiers.base.name,
+        priceMonthly: tiers.base.priceMonthly,
+        monthlyLimit: tiers.base.monthlyLimit,
+        description: tiers.base.description
+      },
+      credit: {
+        pricePerCredit: tiers.credit.pricePerCredit,
+        description: tiers.credit.description
+      }
+    }
   });
 });
 
@@ -1414,11 +1647,50 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     apiKeySet: !!process.env.GEMINI_API_KEY,
-    stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
+    stripeConfigured: !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_BASE),
     supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY),
     epsteinPhotosCount: photos.length,
     anonymousUsersTracked: anonymousStats.totalTracked
   });
+});
+
+// ===== LOCAL DEV DEBUG ROUTES =====
+
+app.get('/api/dev/debug', (req, res) => {
+  if (isProduction || !isLocalRequest(req)) {
+    return res.status(404).json({ allowed: false });
+  }
+
+  res.json({
+    allowed: true,
+    enabled: req.isDevDebug === true
+  });
+});
+
+app.post('/api/dev/debug', (req, res) => {
+  if (isProduction || !isLocalRequest(req)) {
+    return res.status(403).json({ allowed: false });
+  }
+
+  const enabled = req.body?.enabled === true;
+  if (enabled) {
+    res.cookie(DEV_DEBUG_COOKIE, '1', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+  } else {
+    res.clearCookie(DEV_DEBUG_COOKIE, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/'
+    });
+  }
+
+  res.json({ allowed: true, enabled });
 });
 
 // ===== ADMIN DEBUG MODE ROUTES =====
