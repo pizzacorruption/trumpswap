@@ -2673,6 +2673,16 @@
           const data = await res.json();
           serverUsageCount = data.usage?.used || 0;
           userTier = data.usage?.tier || 'free';
+
+          // Update quick/premium remaining counts for button display
+          if (typeof data.usage?.quickRemaining === 'number') {
+            quickRemainingCount = Math.max(0, data.usage.quickRemaining);
+          }
+          if (typeof data.usage?.premiumRemaining === 'number') {
+            premiumRemainingCount = Math.max(0, data.usage.premiumRemaining);
+          }
+
+          updateRemainingDisplay();
           updateAuthUI();
         }
       } catch (err) {

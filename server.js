@@ -1426,7 +1426,14 @@ app.get('/api/me', async (req, res) => {
         limit: usage.limit,
         remaining: usage.remaining,
         canGenerate: usage.canGenerate,
-        // New monthly and credit fields
+        // Quick/Premium model-specific usage
+        quickUsed: usage.quickUsed || 0,
+        quickRemaining: usage.quickRemaining || 0,
+        quickLimit: usage.quickLimit || 0,
+        premiumUsed: usage.premiumUsed || 0,
+        premiumRemaining: usage.premiumRemaining || 0,
+        premiumLimit: usage.premiumLimit || 0,
+        // Monthly and credit fields
         monthlyUsed: usage.monthlyUsed,
         monthlyLimit: usage.monthlyLimit,
         monthlyRemaining: usage.monthlyRemaining,
