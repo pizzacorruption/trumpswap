@@ -123,25 +123,32 @@ function getCreditCost(modelType) {
  */
 function getAnonymousUsageCounts(anonId, ipAddress) {
   const now = Date.now();
+  let cookieQuick = 0, cookiePremium = 0;
+  let ipQuick = 0, ipPremium = 0;
 
-  // Try anon_id first (primary key for persistent tracking)
+  // Check cookie-based tracking (anon_id)
   if (anonId) {
-    // Check cache
     const cached = anonUsageCache.get(anonId);
     if (cached && cached.cachedAt >= now - CACHE_TTL) {
-      return { quickCount: cached.quickCount, premiumCount: cached.premiumCount };
+      cookieQuick = cached.quickCount || 0;
+      cookiePremium = cached.premiumCount || 0;
     }
   }
 
-  // Fallback to IP-based in-memory storage
+  // Check IP-based tracking (prevents cookie clearing bypass)
   if (ipAddress) {
     const entry = anonymousUsageFallback.get(ipAddress);
     if (entry && entry.createdAt >= now - ANONYMOUS_USAGE_TTL) {
-      return { quickCount: entry.quickCount || 0, premiumCount: entry.premiumCount || 0 };
+      ipQuick = entry.quickCount || 0;
+      ipPremium = entry.premiumCount || 0;
     }
   }
 
-  return { quickCount: 0, premiumCount: 0 };
+  // Return the HIGHER of cookie vs IP counts (prevents bypass by clearing cookies)
+  return {
+    quickCount: Math.max(cookieQuick, ipQuick),
+    premiumCount: Math.max(cookiePremium, ipPremium)
+  };
 }
 
 /**

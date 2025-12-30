@@ -2173,6 +2173,36 @@
       height: 24px;
     }
 
+    .auth-card .btn-continue-anon {
+      width: 100%;
+      padding: 12px 24px;
+      font-size: 1rem;
+      background: transparent;
+      color: #888;
+      border: 2px solid #444;
+      cursor: pointer;
+      margin-top: 12px;
+      font-family: 'VT323', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.2s ease;
+    }
+
+    .auth-card .btn-continue-anon:hover {
+      color: #fff;
+      border-color: #666;
+      background: #222;
+    }
+
+    .auth-card .anon-limit-note {
+      margin-top: 16px;
+      color: #666;
+      font-size: 0.85rem;
+      font-family: 'VT323', monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
     .auth-card .auth-footer {
       margin-top: 24px;
       color: #666;
@@ -2868,8 +2898,17 @@
             </svg>
             Sign in with Google
           </button>
+          <button class="btn-continue-anon" id="overlayContinueBtn">
+            Continue without account
+          </button>
+          <p class="anon-limit-note">3 free generations (IP limited)</p>
         `;
         document.getElementById('overlayGoogleBtn').addEventListener('click', signInWithGoogle);
+        document.getElementById('overlayContinueBtn').addEventListener('click', () => {
+          authOverlay.classList.add('hidden');
+          userTier = 'anonymous';
+          fetchAnonymousUsage();
+        });
 
         // Also update the auth bar (hidden behind overlay)
         googleSignInBtn.classList.remove('auth-hidden');
