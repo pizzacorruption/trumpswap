@@ -129,7 +129,8 @@ module.exports = async function handler(req, res) {
     console.error('Watermark removal checkout creation error:', error.message);
     res.status(500).json({
       error: 'Failed to create watermark removal checkout session',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message, // Temporarily show error in production for debugging
+      hasWatermarkPrice: !!process.env.STRIPE_PRICE_WATERMARK
     });
   }
 };
