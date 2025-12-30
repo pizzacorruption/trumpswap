@@ -1287,25 +1287,63 @@ app.post('/api/buy-credits', checkoutLimiter, requireAuth, async (req, res) => {
 /**
  * POST /api/buy-watermark-removal
  * Creates a Stripe checkout session for watermark removal + premium generation ($2.99)
- * SECURITY: Requires authentication
+ * Supports both authenticated AND anonymous users
  */
-app.post('/api/buy-watermark-removal', checkoutLimiter, requireAuth, async (req, res) => {
+app.post('/api/buy-watermark-removal', checkoutLimiter, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const email = req.user.email;
+    const { generationId, viewToken } = req.body || {};
 
-    if (!email) {
-      return res.status(400).json({
-        error: 'User email not found. Please sign in again.'
+    // AUTHENTICATED USER PATH
+    if (req.user) {
+      const userId = req.user.id;
+      const email = req.user.email;
+
+      if (!email) {
+        return res.status(400).json({
+          error: 'User email not found. Please sign in again.'
+        });
+      }
+
+      const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
+        userId,
+        email,
+        generationId
+      });
+
+      return res.json({
+        success: true,
+        checkoutUrl: url,
+        sessionId
       });
     }
 
-    const { url, sessionId } = await stripeService.createWatermarkRemovalSession(userId, email);
+    // ANONYMOUS USER PATH
+    // For anonymous users, we need generationId to track the purchase
+    if (!generationId) {
+      return res.status(400).json({
+        error: 'Generation required',
+        message: 'Generate an image first to unlock watermark removal'
+      });
+    }
+
+    // Get anon_id from cookie for tracking
+    const anonId = req.cookies?.anon_id || null;
+
+    // Generate a unique purchase token for this anonymous purchase
+    const purchaseToken = crypto.randomUUID();
+
+    const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
+      anonId,
+      generationId,
+      viewToken,
+      purchaseToken
+    });
 
     res.json({
       success: true,
-      url,
-      sessionId
+      checkoutUrl: url,
+      sessionId,
+      purchaseToken
     });
   } catch (error) {
     console.error('Watermark removal checkout error:', error.message);

@@ -167,37 +167,26 @@ async function createCreditCheckoutSession(userId, email, quantity = 1) {
 
 /**
  * Create a Stripe Checkout session for watermark removal + 1 premium generation ($2.99)
- * @param {string} userId - Internal user ID
- * @param {string} email - User's email address
+ * Supports both authenticated and anonymous users
+ *
+ * @param {Object} options - Session options
+ * @param {string} [options.userId] - Internal user ID (for authenticated users)
+ * @param {string} [options.email] - User's email address (for authenticated users)
+ * @param {string} [options.anonId] - Anonymous session ID (for anonymous users)
+ * @param {string} [options.generationId] - Generation ID to unlock
+ * @param {string} [options.viewToken] - View token for the generation
+ * @param {string} [options.purchaseToken] - Unique token for anonymous purchases
  * @returns {Promise<{url: string, sessionId: string}>}
  */
-async function createWatermarkRemovalSession(userId, email) {
+async function createWatermarkRemovalSession(options) {
+  const { userId, email, anonId, generationId, viewToken, purchaseToken } = options;
+
   const priceId = (process.env.STRIPE_PRICE_WATERMARK || '').trim();
   if (!priceId) {
     throw new Error('STRIPE_PRICE_WATERMARK not configured');
   }
 
-  // Get or create user
-  const user = getUser(userId);
-  user.email = email;
-
-  // Create or retrieve Stripe customer
-  let customerId = user.stripe_customer_id;
-
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email,
-      metadata: {
-        userId
-      }
-    });
-    customerId = customer.id;
-    user.stripe_customer_id = customerId;
-  }
-
-  // Create checkout session for one-time watermark removal purchase
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
+  const sessionConfig = {
     payment_method_types: ['card'],
     line_items: [
       {
@@ -209,10 +198,44 @@ async function createWatermarkRemovalSession(userId, email) {
     success_url: `${process.env.APP_URL || 'http://localhost:3000'}/?watermark_removed=true&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/?canceled=true`,
     metadata: {
-      userId,
-      type: 'watermark_removal'
+      type: 'watermark_removal',
+      generationId: generationId || '',
+      viewToken: viewToken || ''
     }
-  });
+  };
+
+  // AUTHENTICATED USER PATH
+  if (userId && email) {
+    // Get or create user
+    const user = getUser(userId);
+    user.email = email;
+
+    // Create or retrieve Stripe customer
+    let customerId = user.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email,
+        metadata: {
+          userId
+        }
+      });
+      customerId = customer.id;
+      user.stripe_customer_id = customerId;
+    }
+
+    sessionConfig.customer = customerId;
+    sessionConfig.metadata.userId = userId;
+  } else {
+    // ANONYMOUS USER PATH
+    // Let Stripe collect email and create customer automatically
+    sessionConfig.customer_creation = 'always';
+    sessionConfig.metadata.anonId = anonId || '';
+    sessionConfig.metadata.purchaseToken = purchaseToken || '';
+  }
+
+  // Create checkout session
+  const session = await stripe.checkout.sessions.create(sessionConfig);
 
   return {
     url: session.url,

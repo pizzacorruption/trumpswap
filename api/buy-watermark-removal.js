@@ -1,5 +1,6 @@
 const stripeService = require('../services/stripe');
 const { verifyToken } = require('../lib/supabase');
+const crypto = require('crypto');
 
 // Allowed origins for CORS (configure via environment variable)
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
@@ -35,14 +36,15 @@ function setCorsHeaders(req, res) {
 }
 
 /**
- * Verify JWT token from Authorization header
- * Returns { user, error }
+ * Verify JWT token from Authorization header (optional)
+ * Returns { user, error } - error is null if no auth header present
  */
 async function authenticateRequest(req) {
   const authHeader = req.headers.authorization;
 
+  // No auth header is OK for anonymous users
   if (!authHeader) {
-    return { user: null, error: 'Authorization header required' };
+    return { user: null, error: null };
   }
 
   const parts = authHeader.split(' ');
@@ -69,12 +71,21 @@ async function authenticateRequest(req) {
 }
 
 /**
+ * Get anon_id from cookie
+ */
+function getAnonIdFromCookie(req) {
+  const cookies = req.headers.cookie || '';
+  const match = cookies.match(/anon_id=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+/**
  * POST /api/buy-watermark-removal
  * Creates a Stripe checkout session for watermark removal + 1 premium generation ($2.99)
  *
- * REQUIRES AUTHENTICATION
- * - Must provide valid JWT in Authorization header
- * - userId and email are derived from the authenticated user token
+ * Supports both authenticated AND anonymous users:
+ * - Authenticated: Uses userId/email from JWT token
+ * - Anonymous: Uses generationId + viewToken from request body, Stripe collects email
  */
 module.exports = async function handler(req, res) {
   // Set CORS headers (restricted to allowed origins)
@@ -89,42 +100,83 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // Authenticate the request
+    // Try to authenticate (optional for anonymous users)
     const { user, error: authError } = await authenticateRequest(req);
 
-    if (authError || !user) {
+    // If auth was attempted but failed, reject
+    if (authError) {
       return res.status(401).json({
-        error: 'Authentication required',
-        message: authError || 'Please log in to access this resource'
+        error: 'Authentication failed',
+        message: authError
       });
     }
 
-    // Derive userId and email from the authenticated user token
-    const userId = user.id;
-    const email = user.email;
+    // Parse request body
+    const body = req.body || {};
+    const { generationId, viewToken } = body;
 
-    if (!email) {
+    // AUTHENTICATED USER PATH
+    if (user) {
+      const userId = user.id;
+      const email = user.email;
+
+      if (!email) {
+        return res.status(400).json({
+          error: 'User email not available',
+          message: 'Your account does not have an email address associated with it'
+        });
+      }
+
+      // Validate email format (defensive check)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          error: 'Invalid email format in user profile'
+        });
+      }
+
+      const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
+        userId,
+        email,
+        generationId
+      });
+
+      return res.json({
+        success: true,
+        checkoutUrl: url,
+        sessionId
+      });
+    }
+
+    // ANONYMOUS USER PATH
+    // For anonymous users, we need generationId to track the purchase
+    if (!generationId) {
       return res.status(400).json({
-        error: 'User email not available',
-        message: 'Your account does not have an email address associated with it'
+        error: 'Generation required',
+        message: 'Generate an image first to unlock watermark removal'
       });
     }
 
-    // Validate email format (defensive check)
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        error: 'Invalid email format in user profile'
-      });
-    }
+    // Get anon_id from cookie for tracking
+    const anonId = getAnonIdFromCookie(req);
 
-    const { url, sessionId } = await stripeService.createWatermarkRemovalSession(userId, email);
+    // Generate a unique purchase token for this anonymous purchase
+    const purchaseToken = crypto.randomUUID();
 
-    res.json({
+    const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
+      anonId,
+      generationId,
+      viewToken,
+      purchaseToken
+    });
+
+    return res.json({
       success: true,
       checkoutUrl: url,
-      sessionId
+      sessionId,
+      purchaseToken
     });
+
   } catch (error) {
     console.error('Watermark removal checkout creation error:', error.message);
     res.status(500).json({

@@ -2610,6 +2610,10 @@
     let adminPanelVisible = false;
     let lastGenerationDebugInfo = null;
 
+    // Track last generation for watermark removal flow
+    let lastGenerationId = null;
+    let lastViewToken = null;
+
     // Loading messages for better UX - MDE style
     const loadingMessages = [
       { title: 'ANALYZING BIOMETRICS...', subtitle: 'SCANNING FACIAL STRUCTURE', tip: 'NEURAL NETWORK PROCESSING' },
@@ -3784,6 +3788,18 @@
         stopLoadingMessages();
         recIndicator.textContent = 'REC ●';
         recIndicator.classList.remove('disconnected');
+
+        // Store generation identifiers for watermark removal flow
+        lastGenerationId = data.generationId || null;
+        lastViewToken = data.viewToken || null;
+        // Persist to sessionStorage for Stripe redirect round-trip
+        if (lastGenerationId) {
+          sessionStorage.setItem('lastGenerationId', lastGenerationId);
+        }
+        if (lastViewToken) {
+          sessionStorage.setItem('lastViewToken', lastViewToken);
+        }
+
         // Append viewToken to URL for anonymous users to access their images
         let imageUrl = data.imageUrl;
         if (data.viewToken) {
@@ -3900,34 +3916,40 @@
     });
 
     // Remove Watermark button - redirect to Stripe checkout
+    // Works for both authenticated AND anonymous users
     removeWatermarkBtn.addEventListener('click', async () => {
-      // Check if user is logged in
-      if (!currentUser) {
-        // Show auth overlay to sign in first
-        showError('Please sign in to purchase watermark removal');
-        authOverlay.classList.add('visible');
-        return;
-      }
-
       try {
         removeWatermarkBtn.disabled = true;
         removeWatermarkBtn.textContent = 'LOADING...';
 
-        const token = getAuthToken();
-        if (!token) {
-          showError('Please sign in to purchase watermark removal');
-          authOverlay.classList.add('visible');
+        // Get generation info from state or sessionStorage
+        const genId = lastGenerationId || sessionStorage.getItem('lastGenerationId');
+        const viewTok = lastViewToken || sessionStorage.getItem('lastViewToken');
+
+        // For anonymous users, we need the generation info
+        if (!currentUser && !genId) {
+          showError('Generate an image first to unlock watermark removal');
           removeWatermarkBtn.disabled = false;
           removeWatermarkBtn.textContent = 'UNLOCK NOW';
           return;
         }
 
+        // Build headers - add Authorization only if authenticated
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getAuthToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Build request body with generation info for anonymous users
+        const body = {};
+        if (genId) body.generationId = genId;
+        if (viewTok) body.viewToken = viewTok;
+
         const res = await fetch('/api/buy-watermark-removal', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          headers,
+          body: JSON.stringify(body),
           credentials: 'include'
         });
 
