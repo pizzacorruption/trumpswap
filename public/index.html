@@ -3871,9 +3871,21 @@
         removeWatermarkBtn.disabled = true;
         removeWatermarkBtn.textContent = 'LOADING...';
 
+        const token = getAuthToken();
+        if (!token) {
+          showError('Please sign in to purchase watermark removal');
+          authOverlay.classList.add('visible');
+          removeWatermarkBtn.disabled = false;
+          removeWatermarkBtn.textContent = 'UNLOCK NOW';
+          return;
+        }
+
         const res = await fetch('/api/buy-watermark-removal', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           credentials: 'include'
         });
 
