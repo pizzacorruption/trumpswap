@@ -9,6 +9,7 @@ const { getAnonUsage, incrementAnonUsage } = require('../lib/anon');
 const crypto = require('crypto');
 const tiers = require('../config/tiers');
 const { addWatermark } = require('../lib/watermark');
+const generations = require('../services/generations');
 
 // Model configurations from tiers
 const { models } = tiers;
@@ -364,6 +365,10 @@ module.exports = async function handler(req, res) {
     const epsteinPhotoMime = epsteinPhotoExt === '.png' ? 'image/png' :
                              epsteinPhotoExt === '.webp' ? 'image/webp' : 'image/jpeg';
 
+    // Create generation record for tracking (enables UNLOCK NOW flow for anonymous users)
+    const generationRecord = generations.createGeneration(userId, epsteinPhoto);
+    console.log(`   Generation ID: ${generationRecord.id}${userId ? '' : ' (anonymous)'}`);
+
     // Get model configuration based on modelType
     const modelConfig = models[modelType];
     console.log(`Generating Epstein swap with ${modelType} model (${modelConfig.modelId})... Epstein photo: ${epsteinPhoto}`);
@@ -479,10 +484,16 @@ Generate the composited photograph.`;
           const base64Image = imageBuffer.toString('base64');
           const dataUrl = `data:image/png;base64,${base64Image}`;
 
+          // Mark generation as completed
+          generations.completeGeneration(generationRecord.id, dataUrl);
+
           return res.json({
             success: true,
             imageUrl: dataUrl,
             modelType,
+            // Include generation identifiers for UNLOCK NOW flow
+            generationId: generationRecord.id,
+            viewToken: generationRecord.viewToken,
             usage: {
               tier: usage.tier,
               used: usageResult.newCount,
@@ -504,15 +515,22 @@ Generate the composited photograph.`;
 
     // Check for safety blocks
     if (response.candidates?.[0]?.finishReason === 'SAFETY') {
+      generations.failGeneration(generationRecord.id, 'SAFETY_BLOCK', 'Content blocked by safety filters');
       return res.status(400).json({
         error: 'Request blocked by safety filters. Try a different photo.'
       });
     }
 
+    // No image generated
+    generations.failGeneration(generationRecord.id, 'NO_IMAGE', 'No image generated');
     res.status(500).json({ error: 'No image generated. Try again.' });
 
   } catch (error) {
     console.error('Generation error:', error.message);
+    // Mark generation as failed if record exists
+    if (typeof generationRecord !== 'undefined' && generationRecord) {
+      generations.failGeneration(generationRecord.id, 'ERROR', error.message);
+    }
     res.status(500).json({ error: error.message });
   }
 };
