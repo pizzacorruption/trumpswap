@@ -331,6 +331,11 @@ function checkUsage(userId, profile = null, ipAddress = null, modelType = 'quick
   const limit = tierConfig.limit;
   const monthlyLimit = tierConfig.monthlyLimit || limit;
 
+  // For base/paid tier, use shared monthly pool for remaining calculations
+  // For free/anonymous, use separate quick/premium quotas
+  const isSharedPool = tier === 'base' || tier === 'paid';
+  const sharedRemaining = Math.max(0, monthlyLimit - monthlyUsed);
+
   return {
     used,
     limit: limit === Infinity ? 'unlimited' : limit,
@@ -341,14 +346,16 @@ function checkUsage(userId, profile = null, ipAddress = null, modelType = 'quick
     // Monthly tracking (for base/paid)
     monthlyUsed,
     monthlyLimit: monthlyLimit === Infinity ? 'unlimited' : monthlyLimit,
-    monthlyRemaining: monthlyLimit === Infinity ? 'unlimited' : Math.max(0, monthlyLimit - monthlyUsed),
-    // Quick/Premium tracking (for free/anonymous)
+    monthlyRemaining: monthlyLimit === Infinity ? 'unlimited' : sharedRemaining,
+    // Quick/Premium tracking
+    // Base/paid: shared pool (both show same remaining from monthly)
+    // Free/anonymous: separate quotas
     quickUsed,
     quickLimit: tierConfig.quickLimit,
-    quickRemaining: Math.max(0, tierConfig.quickLimit - quickUsed),
+    quickRemaining: isSharedPool ? sharedRemaining : Math.max(0, tierConfig.quickLimit - quickUsed),
     premiumUsed,
     premiumLimit: tierConfig.premiumLimit,
-    premiumRemaining: Math.max(0, tierConfig.premiumLimit - premiumUsed),
+    premiumRemaining: isSharedPool ? sharedRemaining : Math.max(0, tierConfig.premiumLimit - premiumUsed),
     // Credit info
     credits: getCreditBalance(profile),
     // Model-specific info
