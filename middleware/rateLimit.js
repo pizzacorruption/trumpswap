@@ -202,7 +202,12 @@ function createRateLimitMiddleware(options = {}) {
               limit: updatedUsage.limit,
               remaining: updatedUsage.remaining,
               tier: updatedUsage.tier,
-              tierName: updatedUsage.tierName
+              tierName: updatedUsage.tierName,
+              // Model-specific remaining counts for button display
+              quickRemaining: updatedUsage.quickRemaining,
+              premiumRemaining: updatedUsage.premiumRemaining,
+              quickUsed: updatedUsage.quickUsed,
+              premiumUsed: updatedUsage.premiumUsed
             };
           } catch (err) {
             console.error('Error updating usage:', err.message);
