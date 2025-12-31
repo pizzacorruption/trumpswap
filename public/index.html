@@ -3773,22 +3773,13 @@
     }
 
     function updateRemainingDisplay() {
-      // Base tier users have unlimited generations - show UNLIMITED instead of count
-      const isUnlimited = userTier === 'base';
-
+      // Base tier: shared pool of 50/month, show same count on both buttons
+      // Free/Anonymous: separate quick and premium quotas
       if (quickRemaining) {
-        if (isUnlimited) {
-          quickRemaining.textContent = 'UNLIMITED';
-        } else {
-          quickRemaining.textContent = quickRemainingCount > 0 ? `${quickRemainingCount} left` : 'none left';
-        }
+        quickRemaining.textContent = quickRemainingCount > 0 ? `${quickRemainingCount} left` : 'none left';
       }
       if (premiumRemaining) {
-        if (isUnlimited) {
-          premiumRemaining.textContent = 'UNLIMITED';
-        } else {
-          premiumRemaining.textContent = premiumRemainingCount > 0 ? `${premiumRemainingCount} left` : 'none left';
-        }
+        premiumRemaining.textContent = premiumRemainingCount > 0 ? `${premiumRemainingCount} left` : 'none left';
       }
     }
 
