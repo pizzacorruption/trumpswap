@@ -2953,6 +2953,38 @@
 
         if (currentUser) {
           await fetchUserUsage();
+
+          // Check if user just signed in to complete watermark removal flow
+          const pendingWatermarkRemoval = sessionStorage.getItem('pendingWatermarkRemoval');
+          if (pendingWatermarkRemoval === 'true' && event === 'SIGNED_IN') {
+            sessionStorage.removeItem('pendingWatermarkRemoval');
+
+            // Restore UI state from stored photos
+            const pendingUserPhoto = sessionStorage.getItem('pendingUserPhoto');
+            const pendingEpsteinPhoto = sessionStorage.getItem('pendingEpsteinPhoto');
+
+            if (pendingUserPhoto) {
+              previewImg.src = pendingUserPhoto;
+              previewContainer.classList.add('visible');
+            }
+            if (pendingEpsteinPhoto) {
+              selectedPhoto = pendingEpsteinPhoto;
+              gallery.querySelectorAll('.gallery-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.dataset.path === pendingEpsteinPhoto) {
+                  item.classList.add('selected');
+                }
+              });
+            }
+
+            // Auto-trigger watermark removal checkout
+            showToast('CONTINUING TO CHECKOUT...');
+            setTimeout(() => {
+              if (removeWatermarkBtn) {
+                removeWatermarkBtn.click();
+              }
+            }, 1000);
+          }
         } else {
           serverUsageCount = 0;
           userTier = 'free';
@@ -3416,9 +3448,9 @@
       if (watermarkRemoved === 'true' && sessionId) {
         try {
           // Show immediate success feedback
-          showToast('WATERMARK REMOVAL UNLOCKED!');
+          showToast('GENERATING PREMIUM IMAGE...');
 
-          // Verify the session with the server (fallback for when webhooks don't fire)
+          // Verify the session with the server first (adds credits)
           const token = getAuthToken();
           if (token) {
             const response = await fetch('/api/verify-session', {
@@ -3431,8 +3463,8 @@
             });
 
             if (response.ok) {
-              const result = await response.json();
-              console.log('Watermark removal session verified:', result);
+              const verifyResult = await response.json();
+              console.log('Watermark removal session verified:', verifyResult);
 
               // Refresh user usage stats to reflect new credits
               await fetchUserUsage();
@@ -3440,12 +3472,71 @@
             } else {
               console.warn('Could not verify watermark removal session:', await response.text());
             }
+          }
+
+          // Retrieve stored photos for regeneration
+          const pendingUserPhoto = sessionStorage.getItem('pendingUserPhoto');
+          const pendingEpsteinPhoto = sessionStorage.getItem('pendingEpsteinPhoto');
+
+          if (pendingUserPhoto && pendingEpsteinPhoto) {
+            // Restore the UI state
+            previewImg.src = pendingUserPhoto;
+            previewContainer.classList.add('visible');
+            selectedPhoto = pendingEpsteinPhoto;
+
+            // Select the epstein photo in the gallery
+            gallery.querySelectorAll('.gallery-item').forEach(item => {
+              item.classList.remove('selected');
+              if (item.dataset.path === pendingEpsteinPhoto) {
+                item.classList.add('selected');
+              }
+            });
+
+            // Clean up sessionStorage
+            sessionStorage.removeItem('pendingUserPhoto');
+            sessionStorage.removeItem('pendingEpsteinPhoto');
+
+            // Auto-trigger premium generation (user now has credits)
+            loading.classList.add('visible');
+            result.classList.remove('visible');
+
+            // Convert data URL to blob for form submission
+            const blob = await (await fetch(pendingUserPhoto)).blob();
+            const formData = new FormData();
+            formData.append('userPhoto', blob, 'face.jpg');
+            formData.append('epsteinPhoto', pendingEpsteinPhoto);
+            formData.append('modelType', 'premium'); // Use premium model
+
+            const genResponse = await fetch('/api/generate', {
+              method: 'POST',
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+              body: formData,
+              credentials: 'include'
+            });
+
+            const genData = await genResponse.json();
+            if (genData.imageUrl) {
+              resultImage.src = genData.imageUrl;
+              result.classList.add('visible');
+              loading.classList.remove('visible');
+
+              // Hide watermark promo since they just paid
+              if (watermarkPromo) {
+                watermarkPromo.classList.add('hidden');
+              }
+
+              showToast('PREMIUM IMAGE READY!');
+            } else {
+              throw new Error(genData.error || 'Generation failed');
+            }
           } else {
-            // For anonymous users, just refresh usage
-            await fetchAnonymousUsage();
+            // No stored photos - just show success message
+            showToast('WATERMARK REMOVAL UNLOCKED!');
           }
         } catch (err) {
-          console.warn('Error verifying watermark removal session:', err);
+          console.warn('Error in post-payment flow:', err);
+          loading.classList.remove('visible');
+          showError('Generation failed - try again with your new credits');
         }
 
         // Clean up URL to remove query params
@@ -3987,32 +4078,44 @@
     });
 
     // Remove Watermark button - redirect to Stripe checkout
-    // Works for both authenticated AND anonymous users
+    // REQUIRES sign-in first (classic SaaS funnel)
     removeWatermarkBtn.addEventListener('click', async () => {
       try {
         removeWatermarkBtn.disabled = true;
         removeWatermarkBtn.textContent = 'LOADING...';
 
+        // Require sign-in for watermark removal (classic SaaS conversion funnel)
+        if (!currentUser) {
+          // Store everything needed for post-payment regeneration
+          if (previewImg.src && previewImg.src.startsWith('data:')) {
+            sessionStorage.setItem('pendingUserPhoto', previewImg.src);
+          }
+          if (selectedPhoto) {
+            sessionStorage.setItem('pendingEpsteinPhoto', selectedPhoto);
+          }
+          sessionStorage.setItem('pendingWatermarkRemoval', 'true');
+
+          showToast('SIGN IN TO REMOVE WATERMARK');
+          removeWatermarkBtn.disabled = false;
+          removeWatermarkBtn.textContent = 'UNLOCK NOW';
+
+          // Trigger sign-in flow
+          signInWithGoogle();
+          return;
+        }
+
         // Get generation info from state or sessionStorage
         const genId = lastGenerationId || sessionStorage.getItem('lastGenerationId');
         const viewTok = lastViewToken || sessionStorage.getItem('lastViewToken');
 
-        // For anonymous users, we need the generation info
-        if (!currentUser && !genId) {
-          showError('Generate an image first to unlock watermark removal');
-          removeWatermarkBtn.disabled = false;
-          removeWatermarkBtn.textContent = 'UNLOCK NOW';
-          return;
-        }
-
-        // Build headers - add Authorization only if authenticated
+        // Build headers with auth
         const headers = { 'Content-Type': 'application/json' };
         const token = getAuthToken();
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // Build request body with generation info for anonymous users
+        // Build request body
         const body = {};
         if (genId) body.generationId = genId;
         if (viewTok) body.viewToken = viewTok;
@@ -4026,6 +4129,13 @@
 
         const data = await res.json();
         if (data.checkoutUrl) {
+          // Store data for post-payment regeneration
+          if (previewImg.src && previewImg.src.startsWith('data:')) {
+            sessionStorage.setItem('pendingUserPhoto', previewImg.src);
+          }
+          if (selectedPhoto) {
+            sessionStorage.setItem('pendingEpsteinPhoto', selectedPhoto);
+          }
           window.location.href = data.checkoutUrl;
         } else {
           throw new Error(data.error || 'Failed to create checkout');
