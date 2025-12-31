@@ -501,9 +501,9 @@ Generate the composited photograph.`;
               watermarkFree: !shouldWatermark,
               // Quick/Premium specific (for free/anonymous)
               quickUsed: usageResult.newQuickCount,
-              quickRemaining: usage.quickLimit - usageResult.newQuickCount,
+              quickRemaining: Math.max(0, usage.quickLimit - usageResult.newQuickCount),
               premiumUsed: usageResult.newPremiumCount,
-              premiumRemaining: usage.premiumLimit - usageResult.newPremiumCount,
+              premiumRemaining: Math.max(0, usage.premiumLimit - usageResult.newPremiumCount),
               // Credits (if used)
               credits: usageResult.newCredits,
               creditsUsed: usage.useCredit ? usage.creditCost : 0

@@ -2374,7 +2374,7 @@
       <div class="generate-buttons fade-in-up delay-3">
         <button class="btn-generate btn-quick" id="generateQuickBtn" disabled>
           <span>⚡ QUICK (EXPERIMENTAL)</span>
-          <small id="quickRemaining">3 left</small>
+          <small id="quickRemaining">5 left</small>
         </button>
         <button class="btn-generate btn-premium" id="generatePremiumBtn" disabled>
           <span>★ PREMIUM</span>
@@ -3753,7 +3753,9 @@
     }
 
     // Track quick/premium remaining counts
-    let quickRemainingCount = 3;
+    // Default to FREE tier values (5 quick + 1 premium)
+    // Anonymous users (3 quick + 0 premium) will be updated by fetchAnonymousUsage()
+    let quickRemainingCount = 5;
     let premiumRemainingCount = 1;
 
     function checkReady() {
@@ -3771,11 +3773,22 @@
     }
 
     function updateRemainingDisplay() {
+      // Base tier users have unlimited generations - show UNLIMITED instead of count
+      const isUnlimited = userTier === 'base';
+
       if (quickRemaining) {
-        quickRemaining.textContent = quickRemainingCount > 0 ? `${quickRemainingCount} left` : 'none left';
+        if (isUnlimited) {
+          quickRemaining.textContent = 'UNLIMITED';
+        } else {
+          quickRemaining.textContent = quickRemainingCount > 0 ? `${quickRemainingCount} left` : 'none left';
+        }
       }
       if (premiumRemaining) {
-        premiumRemaining.textContent = premiumRemainingCount > 0 ? `${premiumRemainingCount} left` : 'none left';
+        if (isUnlimited) {
+          premiumRemaining.textContent = 'UNLIMITED';
+        } else {
+          premiumRemaining.textContent = premiumRemainingCount > 0 ? `${premiumRemainingCount} left` : 'none left';
+        }
       }
     }
 
