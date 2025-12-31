@@ -2875,8 +2875,10 @@
           userTierBadge.classList.remove('free');
           userTierBadge.classList.add('base');
           upgradeBtn.classList.add('auth-hidden');
-          usageCounterValue.textContent = 'UNLIMITED';
-          usageCounterValue.classList.add('unlimited');
+          // Base tier: show remaining out of 50/month (use quickRemainingCount as proxy)
+          const baseRemaining = quickRemainingCount > 0 ? quickRemainingCount : 0;
+          usageCounterValue.textContent = `${baseRemaining} / 50`;
+          usageCounterValue.classList.remove('unlimited');
         } else {
           userTierBadge.textContent = 'Free';
           userTierBadge.classList.remove('base');
