@@ -3477,6 +3477,11 @@
           // Retrieve stored photos for regeneration
           const pendingUserPhoto = sessionStorage.getItem('pendingUserPhoto');
           const pendingEpsteinPhoto = sessionStorage.getItem('pendingEpsteinPhoto');
+          console.log('Post-payment check:', {
+            hasPendingUserPhoto: !!pendingUserPhoto,
+            hasPendingEpsteinPhoto: !!pendingEpsteinPhoto,
+            pendingEpsteinPhoto
+          });
 
           if (pendingUserPhoto && pendingEpsteinPhoto) {
             // Restore the UI state
@@ -4130,11 +4135,20 @@
         const data = await res.json();
         if (data.checkoutUrl) {
           // Store data for post-payment regeneration
-          if (previewImg.src && previewImg.src.startsWith('data:')) {
-            sessionStorage.setItem('pendingUserPhoto', previewImg.src);
+          // Get the face photo from preview or result image
+          const facePhotoSrc = previewImg.src || resultImage.src;
+          console.log('Storing for regeneration:', {
+            previewSrc: previewImg.src?.substring(0, 50),
+            resultSrc: resultImage.src?.substring(0, 50),
+            selectedPhoto
+          });
+          if (facePhotoSrc && facePhotoSrc.startsWith('data:')) {
+            sessionStorage.setItem('pendingUserPhoto', facePhotoSrc);
+            console.log('Stored pendingUserPhoto');
           }
           if (selectedPhoto) {
             sessionStorage.setItem('pendingEpsteinPhoto', selectedPhoto);
+            console.log('Stored pendingEpsteinPhoto:', selectedPhoto);
           }
           window.location.href = data.checkoutUrl;
         } else {
