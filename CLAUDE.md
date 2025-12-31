@@ -170,6 +170,17 @@ Based on Google's guidance:
 
 ## Common Gotchas & Debugging
 
+> **Deep Dive**: See `TROUBLESHOOTING.md` for flowcharts, diagnostic trees, and comprehensive issue resolution.
+
+### Quick Reference: Critical Issues
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Tier shows FREE after payment | Webhook/verify-session failed | Check STRIPE_WEBHOOK_SECRET in Vercel |
+| Vercel deploy ERROR | >12 serverless functions | Consolidate api/*.js files |
+| Console "not valid JSON" | API endpoint returns 404 | Ensure api/*.js file exists for route |
+| Auth lost after checkout | Supabase session expired | Check localStorage, APP_URL config |
+
 ### "Invalid API key" errors on local
 - Check `.env` has correct `SUPABASE_SERVICE_ROLE_KEY` (not placeholder)
 - Service role key is different from anon key - get it from Supabase dashboard → Settings → API Keys
@@ -193,6 +204,18 @@ Based on Google's guidance:
 ### Local auth not working
 - Auth sessions are domain-specific (localhost vs production)
 - Clear localStorage or use incognito for fresh testing
+
+### Stripe payment succeeds but tier stays FREE
+**This is the #1 payment issue.** Diagnostic order:
+1. Check Supabase: `SELECT tier, stripe_customer_id FROM profiles WHERE email='...'`
+2. If NULL → webhook never fired → check `STRIPE_WEBHOOK_SECRET` in Vercel
+3. Check Vercel deployment status → if ERROR, old code is running
+4. Check Stripe Dashboard → Webhooks → recent events status codes
+
+### Vercel deployment failed (serverless limit)
+- Hobby plan: max 12 serverless functions
+- Count with: `ls -1 api/*.js api/**/*.js 2>/dev/null | wc -l`
+- Fix: consolidate endpoints or upgrade to Pro
 
 ---
 
