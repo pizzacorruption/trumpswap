@@ -394,6 +394,9 @@
         font-size: 2rem;
       }
     }
+
+    .pricing-grid,.guarantee,.canceled-notice { display:none !important; }
+    .demo-notice { border:2px solid #00ffff;color:#fff;padding:24px;line-height:1.5;margin:24px 0; }
   </style>
 </head>
 <body>
@@ -410,7 +413,7 @@
     <div class="auth-required" id="authRequired">
       <div class="logo">&#128274;</div>
       <h2>Sign In Required</h2>
-      <p>Please sign in to purchase a subscription or credits.</p>
+      <p>Sign in on the main page to access existing subscription information.</p>
       <a href="/" class="btn btn-primary">Go to App</a>
     </div>
 
@@ -418,8 +421,9 @@
     <div id="pricingPage">
       <div class="logo fade-in-up">&#127941;</div>
       <h1 class="fade-in-up delay-1">Pimp My Epstein</h1>
-      <p class="subtitle fade-in-up delay-2">Remove watermarks and create more images</p>
+      <p class="subtitle fade-in-up delay-2">Recorded demo — new purchases are closed</p>
 
+      <div class="demo-notice">The site now plays saved examples. No new image generation, credit packs, or subscriptions are sold here. Existing subscriptions are not automatically canceled by this change.</div>
       <div class="canceled-notice" id="canceledNotice">
         Your checkout was canceled. Ready to try again?
       </div>
@@ -427,13 +431,62 @@
       <div class="error" id="error"></div>
 
       <div class="pricing-grid fade-in-up delay-3">
-        <!-- Base Subscription -->
+        <!-- Lite Plan -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Lite Plan</span>
+          </div>
+          <div class="price">$5<span>/month</span></div>
+          <p class="price-description">10 watermark-free images per month</p>
+
+          <ul class="features">
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              10 watermark-free images/month
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Quick &amp; Premium models
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              High-quality downloads
+            </li>
+            <li>
+              <div class="check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              Cancel anytime
+            </li>
+          </ul>
+
+          <button class="btn btn-secondary" id="subscribeLiteBtn">
+            <span class="spinner"></span>
+            <span class="btn-text">Subscribe to Lite</span>
+          </button>
+        </div>
+
+        <!-- Base Plan -->
         <div class="card featured">
           <div class="card-header">
             <span class="card-title">Base Plan</span>
             <span class="badge">Best Value</span>
           </div>
-          <div class="price">$14.99<span>/month</span></div>
+          <div class="price">$15<span>/month</span></div>
           <p class="price-description">50 watermark-free images per month</p>
 
           <ul class="features">
@@ -451,7 +504,7 @@
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
-              High-quality downloads
+              Quick &amp; Premium models
             </li>
             <li>
               <div class="check">
@@ -473,62 +526,7 @@
 
           <button class="btn btn-primary" id="subscribeBtn">
             <span class="spinner"></span>
-            <span class="btn-text">Subscribe Now</span>
-          </button>
-        </div>
-
-        <!-- Credit Pack -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">Credit Pack</span>
-          </div>
-          <div class="price">$3.00<span>/pack</span></div>
-          <p class="price-description">3 credits for watermark-free images</p>
-
-          <ul class="features">
-            <li>
-              <div class="check">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              3 watermark-free images ($1 each)
-            </li>
-            <li>
-              <div class="check">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              Or remove watermark from existing
-            </li>
-            <li>
-              <div class="check">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              Credits never expire
-            </li>
-            <li>
-              <div class="check">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
-              Use anytime
-            </li>
-          </ul>
-
-          <div class="quantity-selector">
-            <label for="creditQty">Packs:</label>
-            <input type="number" id="creditQty" value="1" min="1" max="100">
-          </div>
-          <p class="credit-total" id="creditTotal">Total: $3.00 (3 credits)</p>
-
-          <button class="btn btn-secondary" id="buyCreditsBtn">
-            <span class="spinner"></span>
-            <span class="btn-text">Buy Credit Pack</span>
+            <span class="btn-text">Subscribe to Base</span>
           </button>
         </div>
       </div>
@@ -553,7 +551,7 @@
     // Check URL params for success/cancel states
     const urlParams = new URLSearchParams(window.location.search);
     const sessionId = urlParams.get('session_id');
-    const creditsPurchased = urlParams.get('credits_purchased');
+    const plan = urlParams.get('plan');
     const canceled = urlParams.get('canceled');
 
     // Elements
@@ -565,9 +563,7 @@
     const canceledNotice = document.getElementById('canceledNotice');
     const errorDiv = document.getElementById('error');
     const subscribeBtn = document.getElementById('subscribeBtn');
-    const buyCreditsBtn = document.getElementById('buyCreditsBtn');
-    const creditQtyInput = document.getElementById('creditQty');
-    const creditTotalEl = document.getElementById('creditTotal');
+    const subscribeLiteBtn = document.getElementById('subscribeLiteBtn');
     const manageSection = document.getElementById('manageSection');
     const manageLink = document.getElementById('manageLink');
 
@@ -591,75 +587,18 @@
 
     // Check auth and show appropriate view
     async function init() {
-      // Show success message if returning from successful checkout
-      if (sessionId) {
-        pricingPage.style.display = 'none';
-
-        // Verify the session and update profile (fallback for when webhooks don't work)
-        const token = await getAuthToken();
-        if (token) {
-          try {
-            const response = await fetch('/api/verify-session', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({ sessionId })
-            });
-            const result = await response.json();
-            if (result.success) {
-              console.log('Session verified:', result);
-            }
-          } catch (err) {
-            console.warn('Could not verify session:', err);
-          }
-        }
-
-        if (creditsPurchased) {
-          successTitle.textContent = 'Credits Added!';
-          successText.textContent = `${creditsPurchased} credit(s) have been added to your account.`;
-        }
-
-        successMessage.classList.add('visible');
-        return;
-      }
-
-      // Show canceled notice if checkout was canceled
-      if (canceled === 'true') {
-        canceledNotice.classList.add('visible');
-      }
-
-      // Check if user is authenticated
       const token = await getAuthToken();
       if (!token) {
-        pricingPage.style.display = 'none';
-        authRequired.classList.add('visible');
+        manageSection.style.display = 'block';
+        manageLink.textContent = 'Sign in on the main page to manage an existing subscription';
         return;
       }
-
-      // Check if user has a subscription (show manage link)
       try {
-        const response = await fetch('/api/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        const response = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
         const data = await response.json();
-
-        if (data.profile?.stripe_customer_id) {
-          manageSection.style.display = 'block';
-        }
-      } catch (e) {
-        // Ignore - just don't show manage link
-      }
+        if (data.profile?.stripe_customer_id) manageSection.style.display = 'block';
+      } catch { showError('Existing subscription information could not be loaded.'); }
     }
-
-    // Update credit total when quantity changes
-    creditQtyInput.addEventListener('input', () => {
-      const qty = Math.max(1, Math.min(100, parseInt(creditQtyInput.value) || 1));
-      creditTotalEl.textContent = `Total: $${(qty * 3).toFixed(2)} (${qty * 3} credits)`;
-    });
 
     // Show error
     function showError(message) {
@@ -683,83 +622,16 @@
       }
     }
 
-    // Subscribe button click
-    subscribeBtn.addEventListener('click', async () => {
-      hideError();
-      const token = await getAuthToken();
+    // Subscribe to plan
+    async function subscribeToPlan() {
+      showError('New purchases are closed. The saved examples are free to play.');
+    }
 
-      if (!token) {
-        showError('Please sign in first');
-        return;
-      }
+    // Subscribe to Base button click
+    subscribeBtn.addEventListener('click', () => subscribeToPlan('base', subscribeBtn));
 
-      setLoading(subscribeBtn, true);
-
-      try {
-        const response = await fetch('/api/create-checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-        } else {
-          throw new Error('No checkout URL received');
-        }
-      } catch (error) {
-        setLoading(subscribeBtn, false);
-        showError(error.message || 'Something went wrong. Please try again.');
-      }
-    });
-
-    // Buy credits button click
-    buyCreditsBtn.addEventListener('click', async () => {
-      hideError();
-      const token = await getAuthToken();
-
-      if (!token) {
-        showError('Please sign in first');
-        return;
-      }
-
-      const quantity = Math.max(1, Math.min(100, parseInt(creditQtyInput.value) || 1));
-      setLoading(buyCreditsBtn, true);
-
-      try {
-        const response = await fetch('/api/buy-credits', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ quantity })
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-        } else {
-          throw new Error('No checkout URL received');
-        }
-      } catch (error) {
-        setLoading(buyCreditsBtn, false);
-        showError(error.message || 'Something went wrong. Please try again.');
-      }
-    });
+    // Subscribe to Lite button click
+    subscribeLiteBtn.addEventListener('click', () => subscribeToPlan('lite', subscribeLiteBtn));
 
     // Manage subscription link click
     manageLink.addEventListener('click', async () => {

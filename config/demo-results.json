@@ -1,0 +1,51 @@
+[
+  {
+    "id": "shkreli_ghislaine",
+    "label": "Martin Shkreli",
+    "scene": "/epstein-photos/epstein_ghislain.jpg",
+    "filename": "shkreli_ghislaine.png",
+    "imageUrl": "/demo-results/shkreli_ghislaine.png"
+  },
+  {
+    "id": "biden_ghislaine",
+    "label": "Joe Biden",
+    "scene": "/epstein-photos/epstein_ghislain.jpg",
+    "filename": "biden_ghislaine.png",
+    "imageUrl": "/demo-results/biden_ghislaine.png"
+  },
+  {
+    "id": "test_terry_bill",
+    "label": "Terry Davis",
+    "scene": "/epstein-photos/epstein_bill_silk.jpg",
+    "filename": "test_terry_bill.png",
+    "imageUrl": "/demo-results/test_terry_bill.png"
+  },
+  {
+    "id": "test_kevin_jail",
+    "label": "Kevin O’Leary",
+    "scene": "/epstein-photos/epstein_JAIL.webp",
+    "filename": "test_kevin_jail.png",
+    "imageUrl": "/demo-results/test_kevin_jail.png"
+  },
+  {
+    "id": "holmes_bill",
+    "label": "Elizabeth Holmes",
+    "scene": "/epstein-photos/epstein_bill_silk.jpg",
+    "filename": "holmes_bill.png",
+    "imageUrl": "/demo-results/holmes_bill.png"
+  },
+  {
+    "id": "holmes_summers",
+    "label": "Elizabeth Holmes",
+    "scene": "/epstein-photos/epstein.summers.avif",
+    "filename": "holmes_summers.png",
+    "imageUrl": "/demo-results/holmes_summers.png"
+  },
+  {
+    "id": "biden_chomsky",
+    "label": "Joe Biden",
+    "scene": "/epstein-photos/epstein_chomsky_airplane.webp",
+    "filename": "biden_chomsky.png",
+    "imageUrl": "/demo-results/biden_chomsky.png"
+  }
+]

@@ -14,11 +14,11 @@ const path = require('path');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
 const sharp = require('sharp');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Services
 const generations = require('./services/generations');
 const stripeService = require('./services/stripe');
+const demo = require('./services/demo');
 const { checkUsage, incrementUsage, getAnonymousStats, updateAnonCache } = require('./services/usage');
 
 // Middleware
@@ -348,9 +348,6 @@ function getAdminDebugInfo() {
     }
   };
 }
-
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ===== SUPABASE PROFILE HELPERS =====
 
@@ -687,6 +684,12 @@ app.use(express.static('public'));
 // app.use('/output', express.static('output'));
 app.use('/epstein-photos', express.static('public/epstein-photos'));
 
+// Public canned examples and retired sales never enter auth, upload, or quota middleware.
+app.post('/api/generate', demo.generate);
+app.post('/api/create-checkout', demo.purchasesUnavailable);
+app.post('/api/buy-credits', demo.purchasesUnavailable);
+app.post('/api/buy-watermark-removal', demo.purchasesUnavailable);
+
 // Apply auth middleware globally (non-blocking, just attaches user info)
 app.use(authMiddleware);
 
@@ -780,366 +783,7 @@ app.get('/api/photos', (req, res) => {
   res.json({ photos });
 });
 
-// API: Generate face swap
-// SECURITY: Multiple layers of rate limiting to prevent API key abuse:
-// 1. globalGenerateLimiter - 100 total generations/hour across ALL users (prevents API exhaustion)
-// 2. suspiciousActivityMiddleware - Blocks IPs with >10 requests in 5 minutes
-// 3. rateLimitMiddleware - Per-user rate limits based on tier
-// Order: global limit -> suspicious IP check -> per-user limit -> upload -> multer error handler -> handler
-app.post('/api/generate', globalGenerateLimiter, suspiciousActivityMiddleware, rateLimitMiddleware, upload.single('userPhoto'), handleMulterError, async (req, res) => {
-  // Track generation for authenticated users
-  let generationRecord = null;
-  const userId = req.user?.id || null;
-  const clientIP = getClientIP(req);
-
-  try {
-    const userPhoto = req.file;
-    const { epsteinPhoto, modelType = 'quick' } = req.body;
-
-    // Validate modelType - only allow 'quick' or 'premium'
-    const validModelType = ['quick', 'premium'].includes(modelType) ? modelType : 'quick';
-
-    if (!userPhoto) {
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.INVALID_FORMAT,
-        'Your photo is required',
-        'Please upload a photo of yourself.'
-      ));
-    }
-
-    // Validate file content using magic bytes (not just MIME type from header)
-    const fileType = await import('file-type');
-    const detectedType = await fileType.fileTypeFromBuffer(userPhoto.buffer);
-    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-    if (!detectedType || !allowedMimes.includes(detectedType.mime)) {
-      logError(ERROR_CODES.INVALID_FORMAT, 'File content validation failed');
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.INVALID_FORMAT,
-        'Invalid file content. Only JPEG, PNG, WebP, and HEIC images are allowed.',
-        `Detected type: ${detectedType?.mime || 'unknown'}. The file may be corrupted or disguised.`
-      ));
-    }
-
-    if (!epsteinPhoto) {
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.INVALID_FORMAT,
-        'Epstein photo selection is required',
-        'Please select an Epstein photo from the gallery.'
-      ));
-    }
-
-    // Validate user photo dimensions
-    const userValidation = await validateImageDimensions(userPhoto.buffer, 'User photo');
-    if (!userValidation.valid) {
-      logError(userValidation.code, userValidation.message);
-      return res.status(400).json(createErrorResponse(
-        userValidation.code,
-        userValidation.message,
-        userValidation.details
-      ));
-    }
-
-    // Create generation record for tracking (for ALL users, including anonymous)
-    // This enables secure image access via viewToken for anonymous users
-    generationRecord = generations.createGeneration(userId, epsteinPhoto);
-    console.log(`   Generation ID: ${generationRecord.id}${userId ? '' : ' (anonymous)'}`)
-
-    // SECURITY: Validate epsteinPhoto against whitelist to prevent path traversal attacks
-    // An attacker could send "../../.env" to read server secrets
-    const allowedPhotos = getEpsteinPhotos();
-    const normalizedPath = epsteinPhoto.startsWith('/') ? epsteinPhoto : `/${epsteinPhoto}`;
-    const isValidPhoto = allowedPhotos.some(p => p.path === normalizedPath || p.path === epsteinPhoto);
-
-    if (!isValidPhoto) {
-      logError(ERROR_CODES.GENERATION_FAILED, `Invalid epstein photo path (possible attack): ${epsteinPhoto}`);
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.GENERATION_FAILED,
-        'Invalid photo selection.',
-        'Please select a valid photo from the gallery.'
-      ));
-    }
-
-    // Read the Epstein photo from disk
-    // SECURITY: Strip leading slash to prevent path.join treating it as absolute path
-    // Then use path.resolve and verify the result is within the allowed directory
-    const sanitizedPath = epsteinPhoto.replace(/^\/+/, ''); // Strip leading slashes
-    const epsteinPhotosDir = path.resolve(__dirname, 'public', 'epstein-photos');
-    const epsteinPhotoPath = path.resolve(__dirname, 'public', sanitizedPath);
-
-    // SECURITY: Verify the resolved path is within the epstein-photos directory
-    if (!epsteinPhotoPath.startsWith(epsteinPhotosDir + path.sep) && epsteinPhotoPath !== epsteinPhotosDir) {
-      logError(ERROR_CODES.GENERATION_FAILED, `Path traversal attempt blocked: ${epsteinPhoto} resolved to ${epsteinPhotoPath}`);
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.GENERATION_FAILED,
-        'Invalid photo selection.',
-        'Please select a valid photo from the gallery.'
-      ));
-    }
-
-    if (!fs.existsSync(epsteinPhotoPath)) {
-      logError(ERROR_CODES.GENERATION_FAILED, `Epstein photo not found: ${epsteinPhoto}`);
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.GENERATION_FAILED,
-        'Selected Epstein photo not found.',
-        'Please refresh the page and try again.'
-      ));
-    }
-
-    const epsteinPhotoBuffer = await fsPromises.readFile(epsteinPhotoPath);
-
-    // Detect actual MIME type from file extension
-    const ext = path.extname(sanitizedPath).toLowerCase();
-    const mimeTypes = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-    };
-    const epsteinPhotoMime = mimeTypes[ext] || 'image/jpeg';
-
-    console.log(`\n🎬 Generating Epstein swap...`);
-    console.log(`   Epstein photo: ${epsteinPhoto}`);
-    console.log(`   User photo: ${userValidation.width}x${userValidation.height}px`);
-
-    // Select model based on modelType:
-    // - Quick: Nano Banana (gemini-2.5-flash-image-preview) - fast, good quality
-    // - Premium: Nano Banana Pro (gemini-3-pro-image-preview) - best quality, high fidelity
-    const modelName = validModelType === 'premium'
-      ? 'gemini-3-pro-image-preview'      // Nano Banana Pro (Gemini 3 Pro Image)
-      : 'gemini-2.5-flash-image-preview'; // Nano Banana (Gemini 2.5 Flash Image)
-
-    console.log(`   Model: ${modelName} (${validModelType})`);
-
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      generationConfig: {
-        responseModalities: ['image', 'text'],
-      },
-    });
-
-    // Get per-photo custom prompt (or default if none exists)
-    const prompt = getPromptForPhoto(epsteinPhoto);
-    console.log(`   Using ${photoPrompts[epsteinPhoto.split('/').pop()] ? 'custom' : 'default'} prompt for: ${epsteinPhoto.split('/').pop()}`);
-
-    // Make API request with both images (with timeout protection)
-    let result;
-    const startTime = Date.now();
-    try {
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          const error = new Error('Request timed out');
-          error.isTimeout = true;
-          reject(error);
-        }, GEMINI_TIMEOUT);
-      });
-
-      const generatePromise = model.generateContent([
-        {
-          inlineData: {
-            mimeType: epsteinPhotoMime,
-            data: epsteinPhotoBuffer.toString('base64'),
-          },
-        },
-        {
-          inlineData: {
-            mimeType: userPhoto.mimetype,
-            data: userPhoto.buffer.toString('base64'),
-          },
-        },
-        prompt,
-      ]);
-
-      result = await Promise.race([generatePromise, timeoutPromise]);
-    } catch (apiError) {
-      // Handle timeout specifically
-      if (apiError.isTimeout) {
-        logError(ERROR_CODES.TIMEOUT, 'Gemini API timed out', apiError);
-        if (generationRecord) {
-          generations.failGeneration(generationRecord.id, ERROR_CODES.TIMEOUT, 'Request timed out');
-        }
-        return res.status(504).json(createErrorResponse(
-          ERROR_CODES.TIMEOUT,
-          'Request timed out. The AI is taking too long - please try again.',
-          `Generation exceeded ${GEMINI_TIMEOUT / 1000} second limit. This can happen during high traffic.`
-        ));
-      }
-      // Re-throw to be caught by outer catch
-      throw apiError;
-    }
-
-    const response = await result.response;
-    const elapsedTime = Date.now() - startTime;
-
-    // Check for prompt feedback blocks (happens before generation)
-    if (response.promptFeedback?.blockReason) {
-      logError(ERROR_CODES.SAFETY_BLOCK, `Prompt blocked: ${response.promptFeedback.blockReason}`);
-      if (generationRecord) {
-        generations.failGeneration(generationRecord.id, ERROR_CODES.SAFETY_BLOCK, `Prompt blocked: ${response.promptFeedback.blockReason}`);
-      }
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.SAFETY_BLOCK,
-        'Request blocked by content filters. Please try a different photo.',
-        `Block reason: ${response.promptFeedback.blockReason}`
-      ));
-    }
-
-    // Extract generated image
-    if (response.candidates && response.candidates[0]) {
-      const parts = response.candidates[0].content?.parts || [];
-
-      for (const part of parts) {
-        if (part.inlineData) {
-          let imageBuffer = Buffer.from(part.inlineData.data, 'base64');
-
-          // Add watermark (skip only for authenticated admin users)
-          // SECURITY: Only trust req.isAdmin - never trust client-side debug parameter
-          const skipWatermark = req.isAdmin;
-          if (!skipWatermark) {
-            imageBuffer = await addWatermark(imageBuffer);
-          }
-
-          // Save the image with UUID filename (prevents enumeration attacks)
-          const filename = `epstein_${require('crypto').randomUUID()}.png`;
-          const outputPath = path.join('output', filename);
-          await fsPromises.writeFile(outputPath, imageBuffer);
-
-          console.log(`✅ Generated: ${filename}${req.isAdmin ? ' [ADMIN - no watermark]' : ''} (${elapsedTime}ms)`);
-
-          // Mark generation as completed for authenticated users
-          if (generationRecord) {
-            generations.completeGeneration(generationRecord.id, `/output/${filename}`);
-          }
-
-          // Build response
-          const response = {
-            success: true,
-            imageUrl: `/output/${filename}`,
-            generationId: generationRecord?.id || null,
-            // Include viewToken for anonymous users so they can access their images
-            viewToken: generationRecord?.viewToken || null
-          };
-
-          // Add debug info for admin users
-          if (req.isAdmin) {
-            const outputMetadata = await sharp(imageBuffer).metadata();
-            response.debug = {
-              generationTime: elapsedTime,
-              model: modelName,
-              outputDimensions: {
-                width: outputMetadata.width,
-                height: outputMetadata.height
-              },
-              inputDimensions: {
-                width: userValidation.width,
-                height: userValidation.height
-              },
-              watermarkApplied: !skipWatermark,
-              epsteinPhoto: epsteinPhoto,
-              timestamp: new Date().toISOString()
-            };
-          }
-
-          return res.json(response);
-        }
-      }
-    }
-
-    // Check for safety blocks
-    if (response.candidates?.[0]?.finishReason === 'SAFETY') {
-      logError(ERROR_CODES.SAFETY_BLOCK, 'Safety filter blocked request');
-      if (generationRecord) {
-        generations.failGeneration(generationRecord.id, ERROR_CODES.SAFETY_BLOCK, 'Content blocked by safety filters');
-      }
-      return res.status(400).json(createErrorResponse(
-        ERROR_CODES.SAFETY_BLOCK,
-        'Request blocked by safety filters. Try a different photo.',
-        'The AI detected potentially problematic content.'
-      ));
-    }
-
-    // Check for face detection issues in text response
-    const faceIssue = analyzeResponseForFaceIssues(response);
-    if (faceIssue.hasFaceIssue) {
-      logError(faceIssue.code, faceIssue.message);
-      if (generationRecord) {
-        generations.failGeneration(generationRecord.id, faceIssue.code, faceIssue.message);
-      }
-      return res.status(400).json(createErrorResponse(
-        faceIssue.code,
-        faceIssue.message,
-        faceIssue.details
-      ));
-    }
-
-    // No image generated
-    logError(ERROR_CODES.GENERATION_FAILED, 'No image in response');
-    if (generationRecord) {
-      generations.failGeneration(generationRecord.id, ERROR_CODES.GENERATION_FAILED, 'No image generated');
-    }
-    res.status(500).json(createErrorResponse(
-      ERROR_CODES.GENERATION_FAILED,
-      'No image generated. Please try again.',
-      'The AI did not return an image. This can happen occasionally.'
-    ));
-
-  } catch (error) {
-    // Parse Gemini-specific errors
-    const parsedError = parseGeminiError(error);
-    logError(parsedError.code, parsedError.message, error);
-
-    // Mark generation as failed
-    if (generationRecord) {
-      generations.failGeneration(generationRecord.id, parsedError.code, parsedError.message);
-    }
-
-    // Return appropriate HTTP status based on error type
-    const statusCode = parsedError.code === ERROR_CODES.RATE_LIMITED ? 429 :
-      parsedError.code === ERROR_CODES.TIMEOUT ? 504 :
-        parsedError.code === ERROR_CODES.SAFETY_BLOCK ? 400 : 500;
-
-    res.status(statusCode).json(createErrorResponse(
-      parsedError.code,
-      parsedError.message,
-      parsedError.details
-    ));
-  }
-});
-
 // ===== STRIPE PAYMENT ROUTES =====
-
-/**
- * POST /api/create-checkout
- * Creates a Stripe checkout session for $14.99/mo Base subscription
- * SECURITY: Requires authentication and verifies userId matches authenticated user
- */
-app.post('/api/create-checkout', checkoutLimiter, requireAuth, async (req, res) => {
-  try {
-    // SECURITY: Use authenticated user's ID and email, not from request body
-    // This prevents attackers from creating checkout sessions for other users
-    const userId = req.user.id;
-    const email = req.user.email;
-
-    if (!email) {
-      return res.status(400).json({
-        error: 'User email not found. Please sign in again.'
-      });
-    }
-
-    const { url, sessionId } = await stripeService.createCheckoutSession(userId, email);
-
-    res.json({
-      success: true,
-      checkoutUrl: url,
-      sessionId
-    });
-  } catch (error) {
-    console.error('Checkout creation error:', error.message);
-    res.status(500).json({
-      error: 'Failed to create checkout session',
-      details: error.message
-    });
-  }
-});
 
 /**
  * GET /api/subscription
@@ -1193,110 +837,6 @@ app.post('/api/cancel-subscription', requireAuth, async (req, res) => {
     console.error('Subscription cancellation error:', error.message);
     res.status(500).json({
       error: 'Failed to cancel subscription',
-      details: error.message
-    });
-  }
-});
-
-/**
- * POST /api/buy-credits
- * Creates a Stripe checkout session for credit purchase ($3/credit)
- * SECURITY: Requires authentication
- */
-app.post('/api/buy-credits', checkoutLimiter, requireAuth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const email = req.user.email;
-    const quantity = Math.min(Math.max(parseInt(req.body.quantity) || 1, 1), 100); // 1-100 credits
-
-    if (!email) {
-      return res.status(400).json({
-        error: 'User email not found. Please sign in again.'
-      });
-    }
-
-    const { url, sessionId } = await stripeService.createCreditCheckoutSession(userId, email, quantity);
-
-    res.json({
-      success: true,
-      checkoutUrl: url,
-      sessionId,
-      quantity
-    });
-  } catch (error) {
-    console.error('Credit checkout creation error:', error.message);
-    res.status(500).json({
-      error: 'Failed to create credit checkout session',
-      details: error.message
-    });
-  }
-});
-
-/**
- * POST /api/buy-watermark-removal
- * Creates a Stripe checkout session for watermark removal + premium generation ($2.99)
- * Supports both authenticated AND anonymous users
- */
-app.post('/api/buy-watermark-removal', checkoutLimiter, async (req, res) => {
-  try {
-    const { generationId, viewToken } = req.body || {};
-
-    // AUTHENTICATED USER PATH
-    if (req.user) {
-      const userId = req.user.id;
-      const email = req.user.email;
-
-      if (!email) {
-        return res.status(400).json({
-          error: 'User email not found. Please sign in again.'
-        });
-      }
-
-      const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
-        userId,
-        email,
-        generationId
-      });
-
-      return res.json({
-        success: true,
-        checkoutUrl: url,
-        sessionId
-      });
-    }
-
-    // ANONYMOUS USER PATH
-    // For anonymous users, we need generationId to track the purchase
-    if (!generationId) {
-      return res.status(400).json({
-        error: 'Generation required',
-        message: 'Generate an image first to unlock watermark removal'
-      });
-    }
-
-    // Get anon_id from cookie for tracking
-    const anonId = req.cookies?.anon_id || null;
-
-    // Generate a unique purchase token for this anonymous purchase
-    const purchaseToken = crypto.randomUUID();
-
-    const { url, sessionId } = await stripeService.createWatermarkRemovalSession({
-      anonId,
-      generationId,
-      viewToken,
-      purchaseToken
-    });
-
-    res.json({
-      success: true,
-      checkoutUrl: url,
-      sessionId,
-      purchaseToken
-    });
-  } catch (error) {
-    console.error('Watermark removal checkout error:', error.message);
-    res.status(500).json({
-      error: 'Failed to create checkout session',
       details: error.message
     });
   }
@@ -1656,39 +1196,16 @@ app.get('/output/:filename', outputLimiter, async (req, res) => {
 
 /**
  * GET /api/config
- * Returns public client configuration (Supabase URL, pricing, etc.)
+ * Returns public sign-in configuration and the canned demo catalog.
  */
 app.get('/api/config', (req, res) => {
   const supabaseConfig = getClientConfig();
-
   res.json({
     supabase: {
       url: supabaseConfig.url,
       anonKey: supabaseConfig.anonKey
     },
-    tiers: Object.entries(tiers)
-      .filter(([key]) => key !== 'credit')  // Don't include credit as a tier
-      .map(([key, value]) => ({
-        id: key,
-        name: value.name,
-        limit: value.limit === Infinity ? 'unlimited' : value.limit,
-        monthlyLimit: value.monthlyLimit === Infinity ? 'unlimited' : value.monthlyLimit,
-        description: value.description,
-        watermarkFree: value.watermarkFree || false,
-        priceMonthly: value.priceMonthly || null
-      })),
-    pricing: {
-      subscription: {
-        name: tiers.base.name,
-        priceMonthly: tiers.base.priceMonthly,
-        monthlyLimit: tiers.base.monthlyLimit,
-        description: tiers.base.description
-      },
-      credit: {
-        pricePerCredit: tiers.credit.pricePerCredit,
-        description: tiers.credit.description
-      }
-    }
+    demo: { samples: require('./config/demo-results.json') }
   });
 });
 
